@@ -1,0 +1,94 @@
+# Chat App SDK - Web Components Example
+
+This is an example project demonstrating how to use Web Components with `@glodon-aiot/chat-app-sdk`.
+
+## Features
+
+- ✅ Web Components integration
+- ✅ Custom JsonItem component
+- ✅ Custom ContentBox component
+- ✅ Search result display
+- ✅ Knowledge reference display
+- ✅ Network search toggle
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 18
+- npm/pnpm/yarn
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+# or
+pnpm install
+# or
+yarn install
+```
+
+### Configuration
+
+1. Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+
+2. Fill in your configuration:
+```env
+VITE_CHAT_APP_COZE_TOKEN=your-token
+VITE_CHAT_APP_CHATFLOW_COZE_APP_ID=your-app-id
+VITE_CHAT_APP_CHATFLOW_COZE_WORKFLOW_ID=your-workflow-id
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Build
+
+```bash
+npm run build
+```
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── WebComponentDemo.tsx      # Main demo component
+│   ├── search-result-list.ts      # Search result Web Component
+│   ├── knowledge-reference-list.ts # Knowledge reference Web Component
+│   └── index.ts                   # Exports
+├── App.tsx                        # Root component
+└── main.tsx                       # Entry point
+```
+
+## Usage
+
+This example demonstrates:
+
+1. **Custom JsonItem Component**: Shows how to create a custom JsonItem using Web Components
+2. **Custom ContentBox Component**: Shows how to customize the content box
+3. **Search Results**: Displays search results using Web Components
+4. **Knowledge References**: Displays knowledge base references
+
+## Learn More
+
+- [Chat App SDK Documentation](../../README.md)
+- [Web Components Guide](https://developer.mozilla.org/en-US/docs/Web/Web_Components)
+
+## License
+
+Apache-2.0
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
