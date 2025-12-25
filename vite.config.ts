@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { splitVendorChunkPlugin } from 'vite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -170,6 +171,8 @@ export default defineConfig({
   plugins: [
     react(),
     sdkAssetsDevPlugin(), // 开发环境资源处理插件
+    // 自动分离 vendor chunk（node_modules 依赖）
+    splitVendorChunkPlugin(),
     // 构建时复制 SDK 资源文件到 dist 目录
     viteStaticCopy({
       targets: getSdkAssets(),
@@ -227,10 +230,31 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false, // 生产环境禁用 sourcemap 以减小文件大小
+    // 启用代码压缩（使用 esbuild，更快）
+    minify: 'esbuild',
+    // 配置 chunk 大小警告阈值
+    chunkSizeWarningLimit: 1000, // 1MB
     rollupOptions: {
-      // 确保正确处理 node_modules 中的 SVG 文件
       output: {
+        // 手动配置代码分割策略
+        manualChunks: (id) => {
+          // 将 chat-app-sdk 单独打包
+          if (id.includes('@glodon-aiot/chat-app-sdk')) {
+            return 'chat-sdk';
+          }
+          // 将 React 相关依赖单独打包
+          if (id.includes('react') || id.includes('react-dom')) {
+            return 'react-vendor';
+          }
+          // 将其他 node_modules 依赖打包到 vendor
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+        // 配置 chunk 文件命名
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: assetInfo => {
           // SVG 文件保持原文件名
           if (assetInfo.name && assetInfo.name.endsWith('.svg')) {

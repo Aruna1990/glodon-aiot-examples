@@ -24,7 +24,8 @@ import { createPortal } from 'react-dom';
 //   Layout,
 // } from '@coze-studio/open-chat/types';
 
-import { WebChatClient } from '@glodon-aiot/chat-app-sdk';
+// 使用动态导入延迟加载 SDK，减少初始 bundle 大小
+// import { WebChatClient } from '@glodon-aiot/chat-app-sdk';
 
 import { SearchResultList } from './search-result-list';
 import { KnowledgeReferenceList } from './knowledge-reference-list';
@@ -1036,7 +1037,7 @@ const NetworkSwitchWrapper = ({
 }: {
   connectNetworkRef: React.MutableRefObject<number>;
   setConnectNetwork: (value: number) => void;
-  clientRef: React.MutableRefObject<WebChatClient | null>;
+  clientRef: React.MutableRefObject<any>; // 使用 any 因为动态导入
   chatType: 'bot' | 'app';
 }) => {
   // 直接从 ref 读取当前值，不使用 state
@@ -1626,11 +1627,12 @@ export const WebComponentDemo = () => {
   );
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState('');
+  const [isLoadingSdk, setIsLoadingSdk] = useState(false); // SDK 加载状态
   const [connectNetwork, setConnectNetwork] = useState<number>(
     initialFormConfig.connectNetwork,
   ); // 联网开关状态：0=不联网，1=自动联网，2=必须联网
   const connectNetworkRef = useRef<number>(initialFormConfig.connectNetwork); // 使用 ref 存储最新值，确保闭包中能访问到最新值
-  const clientRef = useRef<WebChatClient | null>(null); // 保存客户端实例引用
+  const clientRef = useRef<any>(null); // 保存客户端实例引用（使用 any 因为动态导入）
   const [schemaSortConfig, setSchemaSortConfig] = useState<SortConfig>(() =>
     loadConfigFromStorage(),
   );
@@ -1659,7 +1661,7 @@ export const WebComponentDemo = () => {
     saveFormConfigToStorage(formConfig);
   }, [token, chatType, botId, appId, workflowId, draftMode, connectNetwork]);
 
-  const initializeClient = () => {
+  const initializeClient = async () => {
     // 检查浏览器支持
     if (!window.customElements) {
       alert(
@@ -1691,9 +1693,13 @@ export const WebComponentDemo = () => {
     }
 
     setError('');
-    console.log('🚀 Initializing WebChatClient with Web Components...');
+    setIsLoadingSdk(true);
+    console.log('🚀 Loading SDK and initializing WebChatClient...');
 
     try {
+      // 动态导入 SDK（延迟加载，减少初始 bundle 大小）
+      const { WebChatClient } = await import('@glodon-aiot/chat-app-sdk');
+      console.log('✅ SDK loaded successfully');
       // 构建配置对象
       const config: any = {
         type: chatType,
@@ -1809,9 +1815,11 @@ export const WebComponentDemo = () => {
       clientRef.current = client;
 
       setIsInitialized(true);
+      setIsLoadingSdk(false);
       console.log('✅ WebChatClient initialized with Web Components!');
     } catch (err) {
       console.error('❌ Initialization error:', err);
+      setIsLoadingSdk(false);
       setError(
         `初始化失败: ${err instanceof Error ? err.message : String(err)}`,
       );
@@ -2283,28 +2291,34 @@ export const WebComponentDemo = () => {
 
           <button
             onClick={initializeClient}
+            disabled={isLoadingSdk}
             style={{
               width: '100%',
               padding: '14px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: isLoadingSdk
+                ? '#ccc'
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
               fontSize: '16px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: isLoadingSdk ? 'not-allowed' : 'pointer',
               transition: 'transform 0.2s, box-shadow 0.2s',
+              opacity: isLoadingSdk ? 0.7 : 1,
             }}
             onMouseOver={e => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+              if (!isLoadingSdk) {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+              }
             }}
             onMouseOut={e => {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            🚀 初始化聊天客户端
+            {isLoadingSdk ? '⏳ 正在加载 SDK...' : '🚀 初始化聊天客户端'}
           </button>
 
           <div
