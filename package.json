@@ -2,19 +2,33 @@
   "name": "@glodon-aiot/chat-app-sdk-webcomponent-example",
   "version": "1.0.0",
   "description": "Example project demonstrating Web Components integration with @glodon-aiot/chat-app-sdk",
+  "keywords": [
+    "chat-app-sdk",
+    "web-components",
+    "coze",
+    "example",
+    "demo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aruna1990/glodon-aiot-examples.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Glodon AIoT Team",
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "dev": "vite",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@glodon-aiot/chat-app-sdk": "^0.0.1-alpha.17",
+    "@glodon-aiot/chat-app-sdk": "file:../../packages/studio/open-platform/chat-app-sdk",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/node": "^25.0.3",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -25,19 +39,5 @@
     "eslint-plugin-react-refresh": "^0.4.3",
     "typescript": "^5.2.2",
     "vite": "^5.0.8"
-  },
-  "keywords": [
-    "chat-app-sdk",
-    "web-components",
-    "coze",
-    "example",
-    "demo"
-  ],
-  "author": "Glodon AIoT Team",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Aruna1990/glodon-aiot-examples.git"
   }
 }
-

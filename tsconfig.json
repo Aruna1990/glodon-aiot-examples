@@ -17,11 +17,7 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@glodon-aiot/chat-app-sdk": ["../chat-app-sdk/src/index.ts"],
-      "@glodon-aiot/chat-app-sdk/*": ["../chat-app-sdk/src/*"],
-      "@coze-studio/open-chat/types": ["../../open-chat/src/exports/types.ts"],
-      "@coze-studio/open-chat/envs": ["../../open-chat/src/util/env.ts"]
+      "@/*": ["src/*"]
     },
     "typeRoots": ["./node_modules/@types", "../node_modules/@types"]
   },

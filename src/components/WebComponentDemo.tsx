@@ -14,20 +14,149 @@
  * limitations under the License.
  */
 
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useState, useRef, useEffect } from 'react';
 
-import {
-  AuthType,
-  ChatType,
-  Language,
-  Layout,
-} from '@coze-studio/open-chat/types';
+// import {
+//   AuthType,
+//   ChatType,
+//   Language,
+//   Layout,
+// } from '@coze-studio/open-chat/types';
 
-// @ts-ignore - Path alias resolved by vite.config.ts and tsconfig.json
 import { WebChatClient } from '@glodon-aiot/chat-app-sdk';
 
-import { SearchResultList, KnowledgeReferenceList } from './index';
+import { SearchResultList } from './search-result-list';
+import { KnowledgeReferenceList } from './knowledge-reference-list';
+
+// ============================================================================
+// Schema Version 排序配置类型定义
+// ============================================================================
+
+interface SchemaVersionConfig {
+  schemaVersion: string;
+  renderIndex: number;
+}
+
+interface SortConfig {
+  positive: SchemaVersionConfig[]; // renderIndex > 0
+  negative: SchemaVersionConfig[]; // renderIndex < 0
+}
+
+const STORAGE_KEY = '数据定义版本_sort_config';
+
+const DEFAULT_CONFIG: SortConfig = {
+  positive: [
+    { schemaVersion: 'cvforce.knowledge.refrence.v1', renderIndex: 9 },
+  ],
+  negative: [{ schemaVersion: 'cvforce.search.result.v1', renderIndex: -1 }],
+};
+
+// 默认的 数据定义版本（不能删除）
+const DEFAULT_SCHEMA_VERSIONS = [
+  'cvforce.knowledge.refrence.v1',
+  'cvforce.search.result.v1',
+];
+
+// localStorage 工具函数
+const loadConfigFromStorage = (): SortConfig => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // 验证数据结构
+      if (
+        parsed.positive &&
+        Array.isArray(parsed.positive) &&
+        parsed.negative &&
+        Array.isArray(parsed.negative)
+      ) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load config from localStorage:', e);
+  }
+  return DEFAULT_CONFIG;
+};
+
+const saveConfigToStorage = (config: SortConfig): void => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.error('Failed to save config to localStorage:', e);
+  }
+};
+
+// 重新计算 renderIndex（基于顺序）
+const recalculateRenderIndices = (config: SortConfig): SortConfig => {
+  const positive = config.positive.map((item, index) => ({
+    ...item,
+    renderIndex: index + 1, // 1, 2, 3...
+  }));
+  const negative = config.negative.map((item, index) => ({
+    ...item,
+    renderIndex: -(index + 1), // -1, -2, -3...
+  }));
+  return { positive, negative };
+};
+
+// ============================================================================
+// 表单配置类型定义和 localStorage 工具函数
+// ============================================================================
+
+interface FormConfig {
+  token: string;
+  chatType: 'bot' | 'app';
+  botId: string;
+  appId: string;
+  workflowId: string;
+  draftMode: string;
+  connectNetwork: number;
+}
+
+const FORM_STORAGE_KEY = 'webcomponent_demo_form_config';
+
+const DEFAULT_FORM_CONFIG: FormConfig = {
+  token: '',
+  chatType: 'app',
+  botId: '',
+  appId: '',
+  workflowId: '',
+  draftMode: 'true',
+  connectNetwork: 0,
+};
+
+const loadFormConfigFromStorage = (): FormConfig => {
+  try {
+    const stored = localStorage.getItem(FORM_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // 验证数据结构并合并默认值
+      return {
+        ...DEFAULT_FORM_CONFIG,
+        ...parsed,
+        // 确保类型正确
+        chatType: parsed.chatType === 'bot' ? 'bot' : 'app',
+        connectNetwork:
+          typeof parsed.connectNetwork === 'number' ? parsed.connectNetwork : 0,
+        // 如果 draftMode 为空，使用默认值 'true'
+        draftMode: parsed.draftMode || 'true',
+      };
+    }
+  } catch (e) {
+    console.error('Failed to load form config from localStorage:', e);
+  }
+  return DEFAULT_FORM_CONFIG;
+};
+
+const saveFormConfigToStorage = (config: FormConfig): void => {
+  try {
+    localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.error('Failed to save form config to localStorage:', e);
+  }
+};
 
 // 内联 SVG 图标组件
 const AutoIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -143,24 +272,76 @@ class CustomJsonItem extends HTMLElement {
       };
 
       if (mixContent.item_list) {
-        const isRefrence = mixContent.item_list.some(
-          (item: any) =>
-            item.type === 'json' &&
-            item.schema_version === 'cvforce.knowledge.refrence.v1',
-        );
+        // 从 localStorage 读取配置
+        const config = loadConfigFromStorage();
+        console.log('getJSONOutputMessageRenderIndex config:', config);
 
-        if (isRefrence) {
-          return 9; // 负数表示在 chat complete 后渲染
+        // 收集所有匹配的 renderIndex
+        const matchedIndices: number[] = [];
+
+        // 查找消息中是否有配置的 schema_version
+        for (const item of mixContent.item_list) {
+          if (item.type === 'json' && item.schema_version) {
+            console.log(
+              'getJSONOutputMessageRenderIndex checking schema_version:',
+              item.schema_version,
+            );
+
+            // 先在正数区域查找
+            const positiveMatch = config.positive.find(
+              c => c.schemaVersion === item.schema_version,
+            );
+            if (positiveMatch) {
+              console.log(
+                'getJSONOutputMessageRenderIndex found positive match:',
+                positiveMatch.renderIndex,
+              );
+              matchedIndices.push(positiveMatch.renderIndex);
+              continue;
+            }
+
+            // 再在负数区域查找
+            const negativeMatch = config.negative.find(
+              c => c.schemaVersion === item.schema_version,
+            );
+            if (negativeMatch) {
+              console.log(
+                'getJSONOutputMessageRenderIndex found negative match:',
+                negativeMatch.renderIndex,
+              );
+              matchedIndices.push(negativeMatch.renderIndex);
+              continue;
+            }
+
+            console.log(
+              'getJSONOutputMessageRenderIndex no match found for:',
+              item.schema_version,
+            );
+          }
         }
-        // 查找是否有 schema_version 为 cvforce.search.result.v1 的 JsonMixItem
-        const hasSearchResult = mixContent.item_list.some(
-          (item: any) =>
-            item.type === 'json' &&
-            item.schema_version === 'cvforce.search.result.v1',
-        );
 
-        if (hasSearchResult) {
-          return -1; // 负数表示在 chat complete 后渲染
+        // 如果有匹配的，返回优先级最高的（renderIndex 最小）
+        if (matchedIndices.length > 0) {
+          // 负数优先（延迟渲染），然后按绝对值排序
+          const sortedIndices = matchedIndices.sort((a, b) => {
+            // 负数优先
+            if (a < 0 && b >= 0) {
+              return -1;
+            }
+            if (a >= 0 && b < 0) {
+              return 1;
+            }
+            // 同号时，绝对值小的优先
+            return Math.abs(a) - Math.abs(b);
+          });
+          const result = sortedIndices[0];
+          console.log(
+            'getJSONOutputMessageRenderIndex final result:',
+            result,
+            'from matches:',
+            matchedIndices,
+          );
+          return result;
         }
       }
     }
@@ -175,15 +356,20 @@ class CustomJsonItem extends HTMLElement {
   connectedCallback() {
     console.log('[CustomJsonItem] connected');
     this.loadMarkedIfNeeded();
+    // 适配器现在会在首次挂载时调用 updateProps，所以这里不需要立即渲染
+    // 但如果 updateProps 还没被调用，可以尝试从 DOM 属性读取
     this.readPropsFromDOM();
     this.render();
   }
 
+  // 从 DOM 属性读取 props（作为 fallback，适配器现在会在首次挂载时调用 updateProps）
   readPropsFromDOM() {
+    // 读取 schemaVersion（适配器会将字符串设置为 attribute）
     if (!(this as any).schemaVersion && this.hasAttribute('schemaversion')) {
       (this as any).schemaVersion =
         this.getAttribute('schemaversion') || undefined;
     }
+    // 注意：data 是对象，适配器会设置为 property (this.data)，而不是 attribute
   }
 
   updateProps(props: any) {
@@ -194,20 +380,22 @@ class CustomJsonItem extends HTMLElement {
     this.render();
   }
 
+  // 动态加载 marked.js 库
   loadMarkedIfNeeded() {
     if (typeof (window as any).marked !== 'undefined') {
-      return;
+      return; // 已经加载
     }
 
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
     script.onload = () => {
       console.log('[CustomJsonItem] marked.js loaded');
-      this.render();
+      this.render(); // 重新渲染
     };
     document.head.appendChild(script);
   }
 
+  // Markdown 渲染函数
   renderMarkdown(text: string): string {
     if (!text) {
       return '';
@@ -222,9 +410,11 @@ class CustomJsonItem extends HTMLElement {
         return this.escapeHtml(text).replace(/\n/g, '<br>');
       }
     }
+    // Fallback: 简单的文本处理
     return this.escapeHtml(text).replace(/\n/g, '<br>');
   }
 
+  // HTML 转义，防止 XSS
   escapeHtml(text: string): string {
     const div = document.createElement('div');
     div.textContent = text;
@@ -232,15 +422,22 @@ class CustomJsonItem extends HTMLElement {
   }
 
   render() {
+    // 优先从 this 读取（通过 updateProps 设置的）
     let { data } = this as any;
     let { schemaVersion } = this as any;
 
+    // 如果还没有通过 updateProps 设置，尝试从 DOM 属性读取
+    // 这对于历史记录和延迟消息很重要，因为它们首次渲染时 updateProps 可能不会被调用
     if (schemaVersion === undefined && this.hasAttribute('schemaversion')) {
       schemaVersion = this.getAttribute('schemaversion') || undefined;
+      // 保存到 this，避免下次重复读取
       (this as any).schemaVersion = schemaVersion;
     }
 
+    // 如果 data 还没有设置，尝试从 property 读取（适配器可能已经设置了）
     if (data === undefined) {
+      // 适配器会将对象设置为 property，而不是 attribute
+      // 如果 this.data 存在，说明适配器已经设置了
       const dataProperty = (this as any).data;
       if (dataProperty !== undefined) {
         data = dataProperty;
@@ -254,11 +451,13 @@ class CustomJsonItem extends HTMLElement {
       return;
     }
 
+    // 如果数据还没有准备好，不渲染（等待 updateProps 被调用）
     if (data === undefined && schemaVersion === undefined) {
       console.log('[CustomJsonItem] Waiting for props...');
       return;
     }
     if (schemaVersion === 'cvforce.search.result.v1') {
+      // 使用独立的 SearchResultList 组件
       this.shadowRoot.innerHTML = '<search-result-list></search-result-list>';
       const searchResultList = this.shadowRoot.querySelector(
         'search-result-list',
@@ -267,6 +466,7 @@ class CustomJsonItem extends HTMLElement {
         searchResultList.setData(data);
       }
     } else if (schemaVersion === 'cvforce.knowledge.refrence.v1') {
+      // 使用独立的 KnowledgeReferenceList 组件
       this.shadowRoot.innerHTML =
         '<knowledge-reference-list></knowledge-reference-list>';
       const knowledgeReferenceList = this.shadowRoot.querySelector(
@@ -276,6 +476,7 @@ class CustomJsonItem extends HTMLElement {
         knowledgeReferenceList.setData(data);
       }
     } else {
+      // 默认的 JSON 显示
       this.shadowRoot.innerHTML = `
         <style>
           .default-json {
@@ -359,6 +560,7 @@ class CustomContentBox extends HTMLElement {
 
     console.log(`\n${'═'.repeat(65)}`);
 
+    // 保存数据到元素实例
     (this as any).propsData = props;
     this.render();
   }
@@ -371,6 +573,7 @@ class CustomContentBox extends HTMLElement {
     }
 
     if (!props) {
+      // 没有数据时显示默认内容
       this.shadowRoot.innerHTML = `
         <style>
           .content-box {
@@ -413,6 +616,7 @@ class CustomContentBox extends HTMLElement {
       return;
     }
 
+    // 有数据时显示详细信息
     const message = props.message || {};
     const messageText = message.content || '无内容';
     const role = message.role || 'unknown';
@@ -570,51 +774,78 @@ if (!customElements.get('demo-content-box')) {
 // React 组件 - 用于演示
 // ============================================================================
 
-const NetworkSwitch = ({
-  mode,
-  onChange,
-}: {
-  mode: NetworkSearchMode;
-  onChange: (mode: NetworkSearchMode) => void;
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+// 联网搜索下拉菜单组件 - 使用类组件避免 hooks 错误
+class NetworkSwitchClass extends React.Component<
+  {
+    mode: NetworkSearchMode;
+    onChange: (mode: NetworkSearchMode) => void;
+  },
+  {
+    isOpen: boolean;
+    dropdownPosition: { top: number; left: number } | null;
+  }
+> {
+  private buttonRef: React.RefObject<HTMLButtonElement>;
+  private containerRef: React.RefObject<HTMLDivElement>;
+  private clickOutsideHandler: ((event: MouseEvent) => void) | null = null;
 
-  useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.top + window.scrollY,
-        left: rect.left + window.scrollX,
+  constructor(props: {
+    mode: NetworkSearchMode;
+    onChange: (mode: NetworkSearchMode) => void;
+  }) {
+    super(props);
+    this.state = {
+      isOpen: false,
+      dropdownPosition: null,
+    };
+    this.buttonRef = React.createRef();
+    this.containerRef = React.createRef();
+  }
+
+  componentDidUpdate(
+    _prevProps: { mode: NetworkSearchMode },
+    prevState: { isOpen: boolean },
+  ) {
+    // 计算下拉菜单位置（向上弹出）
+    if (this.state.isOpen && !prevState.isOpen && this.buttonRef.current) {
+      const rect = this.buttonRef.current.getBoundingClientRect();
+      this.setState({
+        dropdownPosition: {
+          top: rect.top + window.scrollY,
+          left: rect.left + window.scrollX,
+        },
       });
     }
-  }, [isOpen]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node) &&
-        !(event.target as Element)?.closest('[data-network-dropdown]')
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
+    // 点击外部关闭下拉菜单
+    if (this.state.isOpen && !prevState.isOpen) {
+      this.clickOutsideHandler = (event: MouseEvent) => {
+        if (
+          this.containerRef.current &&
+          !this.containerRef.current.contains(event.target as Node) &&
+          !(event.target as Element)?.closest('[data-network-dropdown]')
+        ) {
+          this.setState({ isOpen: false });
+        }
       };
+      document.addEventListener('mousedown', this.clickOutsideHandler);
+    } else if (
+      !this.state.isOpen &&
+      prevState.isOpen &&
+      this.clickOutsideHandler
+    ) {
+      document.removeEventListener('mousedown', this.clickOutsideHandler);
+      this.clickOutsideHandler = null;
     }
-  }, [isOpen]);
+  }
 
-  const getModeText = (m: NetworkSearchMode) => {
+  componentWillUnmount() {
+    if (this.clickOutsideHandler) {
+      document.removeEventListener('mousedown', this.clickOutsideHandler);
+    }
+  }
+
+  getModeText = (m: NetworkSearchMode) => {
     switch (m) {
       case 0:
         return '关闭联网搜索';
@@ -627,131 +858,176 @@ const NetworkSwitch = ({
     }
   };
 
-  const getModeIcon = (m: NetworkSearchMode) => {
+  getModeIcon = (m: NetworkSearchMode) => {
     const iconStyle = { width: '16px', height: '16px', flexShrink: 0 };
     switch (m) {
       case 0:
-        return <DisableIcon style={iconStyle} />;
+        return React.createElement(DisableIcon, { style: iconStyle });
       case 1:
-        return <AutoIcon style={iconStyle} />;
+        return React.createElement(AutoIcon, { style: iconStyle });
       case 2:
-        return <EnableIcon style={iconStyle} />;
+        return React.createElement(EnableIcon, { style: iconStyle });
       default:
-        return <DisableIcon style={iconStyle} />;
+        return React.createElement(DisableIcon, { style: iconStyle });
     }
   };
 
-  const options: Array<{ value: NetworkSearchMode; label: string }> = [
-    { value: 0, label: '关闭联网搜索' },
-    { value: 1, label: '自动联网搜索' },
-    { value: 2, label: '必须联网搜索' },
-  ];
+  render() {
+    const { mode, onChange } = this.props;
+    const { isOpen, dropdownPosition } = this.state;
 
-  const dropdownContent =
-    isOpen && dropdownPosition ? (
-      <div
-        data-network-dropdown
-        ref={containerRef}
-        style={{
-          position: 'absolute',
-          top: `${dropdownPosition.top}px`,
-          left: `${dropdownPosition.left}px`,
-          background: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-          padding: '4px',
-          minWidth: '160px',
-          zIndex: 10000,
-          transform: 'translateY(calc(-100% - 4px))',
-        }}
-      >
-        {options.map(option => {
-          const isSelected = mode === option.value;
-          return (
-            <div
-              key={option.value}
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
-                cursor: 'pointer',
-                borderRadius: '4px',
-                fontSize: '14px',
-                color: '#333',
-                backgroundColor: isSelected
-                  ? 'rgba(102, 126, 234, 0.1)'
-                  : 'transparent',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={e => {
-                if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-                }
-              }}
-              onMouseLeave={e => {
-                if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              {getModeIcon(option.value)}
-              <span>{option.label}</span>
-            </div>
-          );
-        })}
-      </div>
-    ) : null;
+    const options: Array<{ value: NetworkSearchMode; label: string }> = [
+      { value: 0, label: '关闭联网搜索' },
+      { value: 1, label: '自动联网搜索' },
+      { value: 2, label: '必须联网搜索' },
+    ];
 
-  return (
-    <>
-      <div
-        style={{
-          position: 'relative',
-          display: 'inline-block',
-        }}
-      >
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          title={getModeText(mode)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            userSelect: 'none',
-            padding: '4px',
-            borderRadius: '4px',
-            border: 'none',
-            background: 'transparent',
-            color: '#333',
-            transition: 'background-color 0.2s',
-            width: '24px',
-            height: '24px',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-        >
-          {getModeIcon(mode)}
-        </button>
-      </div>
-      {dropdownContent ? createPortal(dropdownContent, document.body) : null}
-    </>
-  );
+    const dropdownContent =
+      isOpen && dropdownPosition
+        ? createPortal(
+            React.createElement(
+              'div',
+              {
+                'data-network-dropdown': true,
+                ref: this.containerRef,
+                style: {
+                  position: 'absolute',
+                  top: `${dropdownPosition.top}px`,
+                  left: `${dropdownPosition.left}px`,
+                  background: 'white',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                  padding: '4px',
+                  minWidth: '160px',
+                  zIndex: 10000,
+                  transform: 'translateY(calc(-100% - 4px))',
+                },
+              },
+              options.map(option => {
+                const isSelected = mode === option.value;
+                return React.createElement(
+                  'div',
+                  {
+                    key: option.value,
+                    onClick: () => {
+                      onChange(option.value);
+                      this.setState({ isOpen: false });
+                    },
+                    style: {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      color: '#333',
+                      backgroundColor: isSelected
+                        ? 'rgba(102, 126, 234, 0.1)'
+                        : 'transparent',
+                      transition: 'background-color 0.2s',
+                    },
+                    onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor =
+                          'rgba(0, 0, 0, 0.05)';
+                      }
+                    },
+                    onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    },
+                  },
+                  this.getModeIcon(option.value),
+                  React.createElement('span', null, option.label),
+                );
+              }),
+            ),
+            document.body,
+          )
+        : null;
+
+    return React.createElement(
+      React.Fragment,
+      null,
+      React.createElement(
+        'div',
+        {
+          style: {
+            position: 'relative',
+            display: 'inline-block',
+          },
+        },
+        React.createElement(
+          'button',
+          {
+            ref: this.buttonRef,
+            type: 'button',
+            onClick: () => this.setState({ isOpen: !isOpen }),
+            title: this.getModeText(mode),
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              userSelect: 'none',
+              padding: '4px',
+              borderRadius: '4px',
+              border: 'none',
+              background: 'transparent',
+              color: '#333',
+              transition: 'background-color 0.2s',
+              width: '24px',
+              height: '24px',
+            },
+            onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+            },
+            onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            },
+          },
+          this.getModeIcon(mode),
+        ),
+      ),
+      dropdownContent,
+    );
+  }
+}
+
+// 联网搜索下拉菜单组件 - 包装类组件为函数组件
+const NetworkSwitch = ({
+  mode,
+  onChange,
+}: {
+  mode: NetworkSearchMode;
+  onChange: (mode: NetworkSearchMode) => void;
+}) => {
+  // 使用 React.createElement 确保使用正确的 React 实例
+  return React.createElement(NetworkSwitchClass, { mode, onChange });
 };
 
+// 联网搜索模式类型
+// 0: 不联网；1: 自动联网；2: 必须联网
 type NetworkSearchMode = 0 | 1 | 2;
 
+// 将 number 转换为 NetworkSearchMode
+// 0: 不联网；1: 自动联网；2: 必须联网
+const numberToMode = (value: number): NetworkSearchMode => {
+  if (value === 1) {
+    return 1;
+  } // 自动联网
+  if (value === 2) {
+    return 2;
+  } // 必须联网
+  return 0; // 默认不联网
+};
+
+const modeToNumber = (mode: NetworkSearchMode): number => mode;
+
+// 联网开关包装组件，用于在闭包中访问最新的 state
+// 不使用 hooks，直接使用 ref 的值，避免在不同 React 上下文中的 hooks 错误
 const NetworkSwitchWrapper = ({
   connectNetworkRef,
   setConnectNetwork,
@@ -763,51 +1039,32 @@ const NetworkSwitchWrapper = ({
   clientRef: React.MutableRefObject<WebChatClient | null>;
   chatType: 'bot' | 'app';
 }) => {
-  const numberToMode = (value: number): NetworkSearchMode => {
-    if (value === 1) {
-      return 1;
-    }
-    if (value === 2) {
-      return 2;
-    }
-    return 0;
-  };
-
-  const modeToNumber = (mode: NetworkSearchMode): number => mode;
-
-  const [mode, setMode] = useState<NetworkSearchMode>(() =>
-    numberToMode(connectNetworkRef.current),
-  );
-
-  useEffect(() => {
-    setMode(numberToMode(connectNetworkRef.current));
-
-    const syncInterval = setInterval(() => {
-      const currentMode = numberToMode(connectNetworkRef.current);
-      if (currentMode !== mode) {
-        console.log('同步 ref 到 state:', currentMode);
-        setMode(currentMode);
-      }
-    }, 100);
-    return () => clearInterval(syncInterval);
-  }, [mode, connectNetworkRef]);
+  // 直接从 ref 读取当前值，不使用 state
+  const currentMode = numberToMode(connectNetworkRef.current);
 
   const handleChange = (newMode: NetworkSearchMode) => {
     console.log('NetworkSwitchWrapper onChange:', newMode);
-    setMode(newMode);
+    // 更新外部 state 和 ref
     const newValue = modeToNumber(newMode);
     setConnectNetwork(newValue);
     connectNetworkRef.current = newValue;
 
+    // 更新客户端配置中的参数 - 这是关键！
+    // 直接修改对象属性，保持引用不变，这样 non-iframe-app 能立即获取到最新值
     if (clientRef.current && chatType === 'app') {
       const currentConfig = clientRef.current.options?.config;
       if (currentConfig?.appInfo) {
+        // 确保 parameters 对象存在
         if (!currentConfig.appInfo.parameters) {
           currentConfig.appInfo.parameters = {};
         }
+        // 确保 SETTING 对象存在
         if (!currentConfig.appInfo.parameters.SETTING) {
           currentConfig.appInfo.parameters.SETTING = {};
         }
+        // 直接修改对象属性，保持引用不变
+        // 这样 non-iframe-app 中的 parameters 引用会立即反映变化
+        // 0: 不联网；1: 自动联网；2: 必须联网
         (
           currentConfig.appInfo.parameters.SETTING as Record<string, unknown>
         ).ENABLE_NETWORK = newValue;
@@ -825,33 +1082,585 @@ const NetworkSwitchWrapper = ({
     }
   };
 
-  return <NetworkSwitch mode={mode} onChange={handleChange} />;
+  // 使用 React.createElement 确保使用正确的 React 实例
+  return React.createElement(NetworkSwitch, {
+    mode: currentMode,
+    onChange: handleChange,
+  });
+};
+
+// Schema Version 排序配置组件
+const SchemaVersionSortConfig = ({
+  config,
+  onChange,
+}: {
+  config: SortConfig;
+  onChange: (config: SortConfig) => void;
+}) => {
+  const [draggedItem, setDraggedItem] = useState<{
+    schemaVersion: string;
+    sourceArea: 'positive' | 'negative';
+    index: number;
+  } | null>(null);
+  const [newSchemaVersion, setNewSchemaVersion] = useState('');
+  const [newSchemaArea, setNewSchemaArea] = useState<'positive' | 'negative'>(
+    'positive',
+  );
+
+  const handleDragStart = (
+    e: React.DragEvent,
+    dragInfo: {
+      schemaVersion: string;
+      area: 'positive' | 'negative';
+      index: number;
+    },
+  ) => {
+    setDraggedItem({
+      schemaVersion: dragInfo.schemaVersion,
+      sourceArea: dragInfo.area,
+      index: dragInfo.index,
+    });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', ''); // 某些浏览器需要这个
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (
+    e: React.DragEvent,
+    targetArea: 'positive' | 'negative',
+    targetIndex: number,
+  ) => {
+    e.preventDefault();
+    if (!draggedItem) {
+      return;
+    }
+
+    // 防止拖拽到自己身上（同一位置）
+    if (
+      draggedItem.sourceArea === targetArea &&
+      draggedItem.index === targetIndex
+    ) {
+      setDraggedItem(null);
+      return;
+    }
+
+    const newConfig = { ...config };
+
+    if (draggedItem.sourceArea === targetArea) {
+      // 同一区域内移动：直接操作同一个数组
+      const list = [...newConfig[targetArea]];
+      const [removed] = list.splice(draggedItem.index, 1);
+
+      // 如果目标索引大于源索引，需要减1（因为源项已被移除）
+      const adjustedIndex =
+        targetIndex > draggedItem.index ? targetIndex - 1 : targetIndex;
+
+      // 确保索引在有效范围内
+      const finalIndex = Math.max(0, Math.min(adjustedIndex, list.length));
+      list.splice(finalIndex, 0, removed);
+
+      newConfig[targetArea] = list;
+    } else {
+      // 跨区域移动：操作两个不同的数组
+      const sourceList = [...newConfig[draggedItem.sourceArea]];
+      const targetList = [...newConfig[targetArea]];
+
+      // 从源列表移除
+      const [removed] = sourceList.splice(draggedItem.index, 1);
+
+      // 确保目标索引在有效范围内
+      const finalIndex = Math.max(0, Math.min(targetIndex, targetList.length));
+      targetList.splice(finalIndex, 0, removed);
+
+      newConfig[draggedItem.sourceArea] = sourceList;
+      newConfig[targetArea] = targetList;
+    }
+
+    // 去重：确保同一个 数据定义版本 在同一个区域内只出现一次
+    const deduplicatedConfig: SortConfig = {
+      positive: [],
+      negative: [],
+    };
+
+    // 去重正数区域
+    const seenPositive = new Set<string>();
+    for (const item of newConfig.positive) {
+      if (!seenPositive.has(item.schemaVersion)) {
+        seenPositive.add(item.schemaVersion);
+        deduplicatedConfig.positive.push(item);
+      }
+    }
+
+    // 去重负数区域
+    const seenNegative = new Set<string>();
+    for (const item of newConfig.negative) {
+      if (!seenNegative.has(item.schemaVersion)) {
+        seenNegative.add(item.schemaVersion);
+        deduplicatedConfig.negative.push(item);
+      }
+    }
+
+    // 重新计算索引并保存
+    const recalculated = recalculateRenderIndices(deduplicatedConfig);
+    onChange(recalculated);
+    setDraggedItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+  };
+
+  const handleAdd = () => {
+    if (!newSchemaVersion.trim()) {
+      alert('请输入 数据定义版本');
+      return;
+    }
+
+    // 检查是否已存在
+    const existsInPositive = config.positive.some(
+      item => item.schemaVersion === newSchemaVersion.trim(),
+    );
+    const existsInNegative = config.negative.some(
+      item => item.schemaVersion === newSchemaVersion.trim(),
+    );
+
+    if (existsInPositive || existsInNegative) {
+      alert('该 数据定义版本 已存在');
+      return;
+    }
+
+    const newConfig = { ...config };
+    const newItem: SchemaVersionConfig = {
+      schemaVersion: newSchemaVersion.trim(),
+      renderIndex: newSchemaArea === 'positive' ? 1 : -1,
+    };
+
+    if (newSchemaArea === 'positive') {
+      newConfig.positive.push(newItem);
+    } else {
+      newConfig.negative.push(newItem);
+    }
+
+    const recalculated = recalculateRenderIndices(newConfig);
+    onChange(recalculated);
+    setNewSchemaVersion('');
+  };
+
+  const handleDelete = (
+    schemaVersion: string,
+    area: 'positive' | 'negative',
+  ) => {
+    if (DEFAULT_SCHEMA_VERSIONS.includes(schemaVersion)) {
+      alert('默认的 数据定义版本 不能删除');
+      return;
+    }
+
+    const newConfig = { ...config };
+    newConfig[area] = newConfig[area].filter(
+      item => item.schemaVersion !== schemaVersion,
+    );
+
+    const recalculated = recalculateRenderIndices(newConfig);
+    onChange(recalculated);
+  };
+
+  const renderItem = (
+    item: SchemaVersionConfig,
+    area: 'positive' | 'negative',
+    index: number,
+  ) => {
+    const isDefault = DEFAULT_SCHEMA_VERSIONS.includes(item.schemaVersion);
+    const isDragging =
+      draggedItem?.schemaVersion === item.schemaVersion &&
+      draggedItem?.sourceArea === area;
+
+    return (
+      <div key={`${area}-${index}`}>
+        {/* 拖拽插入区域（在项之前） */}
+        <div
+          onDragOver={handleDragOver}
+          onDrop={e => handleDrop(e, area, index)}
+          style={{
+            height: '8px',
+            marginBottom: '4px',
+            borderRadius: '4px',
+            background: draggedItem ? 'transparent' : 'transparent',
+            transition: 'background 0.2s',
+          }}
+          onDragEnter={e => {
+            if (draggedItem) {
+              e.currentTarget.style.background = '#2196f3';
+              e.currentTarget.style.height = '4px';
+            }
+          }}
+          onDragLeave={e => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.height = '8px';
+          }}
+        />
+        <div
+          draggable
+          onDragStart={e =>
+            handleDragStart(e, {
+              schemaVersion: item.schemaVersion,
+              area,
+              index,
+            })
+          }
+          onDragOver={handleDragOver}
+          onDrop={e => handleDrop(e, area, index + 1)}
+          onDragEnd={handleDragEnd}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px',
+            marginBottom: '8px',
+            background: isDragging
+              ? '#e3f2fd'
+              : area === 'positive'
+                ? '#f1f8e9'
+                : '#fff3e0',
+            border: `2px solid ${
+              isDragging
+                ? '#2196f3'
+                : area === 'positive'
+                  ? '#8bc34a'
+                  : '#ff9800'
+            }`,
+            borderRadius: '6px',
+            cursor: 'move',
+            opacity: isDragging ? 0.5 : 1,
+            transition: 'all 0.2s',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '18px',
+              userSelect: 'none',
+              cursor: 'grab',
+            }}
+          >
+            ⋮⋮
+          </div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '14px',
+                color: '#333',
+                marginBottom: '4px',
+              }}
+            >
+              {item.schemaVersion}
+              {isDefault ? (
+                <span
+                  style={{
+                    marginLeft: '8px',
+                    fontSize: '12px',
+                    color: '#666',
+                    fontWeight: 'normal',
+                  }}
+                >
+                  (默认)
+                </span>
+              ) : null}
+            </div>
+            <div
+              style={{
+                fontSize: '12px',
+                color: '#666',
+              }}
+            >
+              渲染索引: {item.renderIndex}
+            </div>
+          </div>
+          <button
+            onClick={() => handleDelete(item.schemaVersion, area)}
+            disabled={isDefault}
+            style={{
+              padding: '4px 8px',
+              background: isDefault ? '#f5f5f5' : '#ff4d4f',
+              color: isDefault ? '#999' : 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isDefault ? 'not-allowed' : 'pointer',
+              fontSize: '12px',
+              opacity: isDefault ? 0.5 : 1,
+            }}
+            title={isDefault ? '默认项不能删除' : '删除'}
+          >
+            删除
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div
+      style={{
+        background: 'white',
+        border: '2px solid #667eea',
+        borderRadius: '12px',
+        padding: '20px',
+        marginBottom: '20px',
+      }}
+    >
+      <h3
+        style={{
+          margin: '0 0 16px 0',
+          color: '#667eea',
+          fontSize: '18px',
+        }}
+      >
+        📋 Schema Version 排序配置
+      </h3>
+      <p
+        style={{
+          margin: '0 0 20px 0',
+          color: '#666',
+          fontSize: '13px',
+        }}
+      >
+        拖拽项目调整顺序，负数区域表示延迟渲染（在 chat complete 后渲染）
+      </p>
+
+      {/* 添加新项 */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '20px',
+          padding: '12px',
+          background: '#f8f9fa',
+          borderRadius: '6px',
+        }}
+      >
+        <input
+          type="text"
+          value={newSchemaVersion}
+          onChange={e => setNewSchemaVersion(e.target.value)}
+          placeholder="输入 数据定义版本"
+          style={{
+            flex: 1,
+            padding: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '14px',
+          }}
+          onKeyPress={e => {
+            if (e.key === 'Enter') {
+              handleAdd();
+            }
+          }}
+        />
+        <select
+          value={newSchemaArea}
+          onChange={e =>
+            setNewSchemaArea(e.target.value as 'positive' | 'negative')
+          }
+          style={{
+            padding: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '14px',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="positive">正数区域</option>
+          <option value="negative">负数区域</option>
+        </select>
+        <button
+          onClick={handleAdd}
+          style={{
+            padding: '8px 16px',
+            background: '#667eea',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold',
+          }}
+        >
+          添加
+        </button>
+      </div>
+
+      {/* 两个区域 */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '20px',
+        }}
+      >
+        {/* 正数区域 */}
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px',
+              padding: '8px',
+              background: '#e8f5e9',
+              borderRadius: '6px',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>✅</span>
+            <span
+              style={{
+                fontWeight: 'bold',
+                color: '#2e7d32',
+                fontSize: '14px',
+              }}
+            >
+              正数区域（正常渲染）
+            </span>
+          </div>
+          <div
+            onDragOver={handleDragOver}
+            onDrop={e => handleDrop(e, 'positive', config.positive.length)}
+            style={{
+              minHeight: '100px',
+              padding: '12px',
+              background: '#f1f8e9',
+              borderRadius: '6px',
+              border: '2px dashed #8bc34a',
+            }}
+          >
+            {config.positive.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  color: '#999',
+                  fontSize: '13px',
+                  padding: '20px',
+                }}
+              >
+                拖拽项目到这里
+              </div>
+            ) : (
+              config.positive.map((item, index) =>
+                renderItem(item, 'positive', index),
+              )
+            )}
+          </div>
+        </div>
+
+        {/* 负数区域 */}
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px',
+              padding: '8px',
+              background: '#fff3e0',
+              borderRadius: '6px',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>⏳</span>
+            <span
+              style={{
+                fontWeight: 'bold',
+                color: '#e65100',
+                fontSize: '14px',
+              }}
+            >
+              负数区域（延迟渲染）
+            </span>
+          </div>
+          <div
+            onDragOver={handleDragOver}
+            onDrop={e => handleDrop(e, 'negative', config.negative.length)}
+            style={{
+              minHeight: '100px',
+              padding: '12px',
+              background: '#fff3e0',
+              borderRadius: '6px',
+              border: '2px dashed #ff9800',
+            }}
+          >
+            {config.negative.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  color: '#999',
+                  fontSize: '13px',
+                  padding: '20px',
+                }}
+              >
+                拖拽项目到这里
+              </div>
+            ) : (
+              config.negative.map((item, index) =>
+                renderItem(item, 'negative', index),
+              )
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export const WebComponentDemo = () => {
-  const [token, setToken] = useState(
-    import.meta.env.VITE_CHAT_APP_COZE_TOKEN || '',
-  );
-  const [chatType, setChatType] = useState<'bot' | 'app'>('app');
-  const [botId, setBotId] = useState(
-    import.meta.env.VITE_CHAT_APP_INDEX_COZE_BOT_ID || '7445716267154833442',
-  );
-  const [appId, setAppId] = useState(
-    import.meta.env.VITE_CHAT_APP_CHATFLOW_COZE_APP_ID || '',
-  );
-  const [workflowId, setWorkflowId] = useState(
-    import.meta.env.VITE_CHAT_APP_CHATFLOW_COZE_WORKFLOW_ID || '',
-  );
+  // 从 localStorage 加载表单配置
+  const initialFormConfig = loadFormConfigFromStorage();
+
+  const [token, setToken] = useState(initialFormConfig.token);
+  const [chatType] = useState<'bot' | 'app'>(initialFormConfig.chatType);
+  const [botId, setBotId] = useState(initialFormConfig.botId);
+  const [appId, setAppId] = useState(initialFormConfig.appId);
+  const [workflowId, setWorkflowId] = useState(initialFormConfig.workflowId);
   const [draftMode, setDraftMode] = useState<string>(
-    import.meta.env.VITE_CHAT_APP_DRAFT_MODE || '',
+    initialFormConfig.draftMode,
   );
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState('');
-  const [connectNetwork, setConnectNetwork] = useState<number>(0);
-  const connectNetworkRef = useRef<number>(0);
-  const clientRef = useRef<WebChatClient | null>(null);
+  const [connectNetwork, setConnectNetwork] = useState<number>(
+    initialFormConfig.connectNetwork,
+  ); // 联网开关状态：0=不联网，1=自动联网，2=必须联网
+  const connectNetworkRef = useRef<number>(initialFormConfig.connectNetwork); // 使用 ref 存储最新值，确保闭包中能访问到最新值
+  const clientRef = useRef<WebChatClient | null>(null); // 保存客户端实例引用
+  const [schemaSortConfig, setSchemaSortConfig] = useState<SortConfig>(() =>
+    loadConfigFromStorage(),
+  );
+
+  // 当 Schema Version 配置改变时保存到 localStorage
+  useEffect(() => {
+    saveConfigToStorage(schemaSortConfig);
+  }, [schemaSortConfig]);
+
+  // 同步 connectNetworkRef
+  useEffect(() => {
+    connectNetworkRef.current = connectNetwork;
+  }, [connectNetwork]);
+
+  // 当表单配置改变时保存到 localStorage
+  useEffect(() => {
+    const formConfig: FormConfig = {
+      token,
+      chatType,
+      botId,
+      appId,
+      workflowId,
+      draftMode,
+      connectNetwork,
+    };
+    saveFormConfigToStorage(formConfig);
+  }, [token, chatType, botId, appId, workflowId, draftMode, connectNetwork]);
 
   const initializeClient = () => {
+    // 检查浏览器支持
     if (!window.customElements) {
       alert(
         '当前浏览器不支持 Web Components，请使用现代浏览器（Chrome 54+, Firefox 63+, Safari 10.1+）',
@@ -859,6 +1668,7 @@ export const WebComponentDemo = () => {
       return;
     }
 
+    // 验证输入
     if (!token.trim()) {
       setError('请输入访问令牌（Token）');
       return;
@@ -884,8 +1694,9 @@ export const WebComponentDemo = () => {
     console.log('🚀 Initializing WebChatClient with Web Components...');
 
     try {
+      // 构建配置对象
       const config: any = {
-        type: chatType === 'app' ? ChatType.APP : undefined,
+        type: chatType,
       };
 
       if (chatType === 'bot') {
@@ -897,6 +1708,7 @@ export const WebComponentDemo = () => {
             : draftMode === 'false'
               ? false
               : undefined;
+        // 同步更新 ref
         connectNetworkRef.current = connectNetwork;
         config.appInfo = {
           appId: appId.trim(),
@@ -904,18 +1716,19 @@ export const WebComponentDemo = () => {
           ...(draftModeValue !== undefined && { draft_mode: draftModeValue }),
           parameters: {
             SETTING: {
-              ENABLE_NETWORK: connectNetwork,
+              ENABLE_NETWORK: connectNetwork, // 0: 不联网；1: 自动联网；2: 必须联网
             },
           },
         };
       }
 
+      // 初始化 WebChatClient
       const client = new WebChatClient({
         env: 'test',
         apiUrl: 'https://aiot-dev.glodon.com/api/cvforcepd/flow',
         config,
         auth: {
-          type: AuthType.TOKEN,
+          type: 'token',
           token: token.trim(),
           onRefreshToken: () => token.trim(),
         },
@@ -926,8 +1739,8 @@ export const WebComponentDemo = () => {
         },
         ui: {
           base: {
-            lang: Language.ZH_CN,
-            layout: Layout.PC,
+            lang: 'zh-CN',
+            layout: 'pc',
             zIndex: 1000,
           },
           asstBtn: {
@@ -935,15 +1748,24 @@ export const WebComponentDemo = () => {
           },
           chatBot: {
             uploadable: true,
-            isNeedClearContext: false,
-            isNeedClearMessage: false,
-            isNeedAddNewConversation: false,
+            isNeedClearContext: false, // 显示清除上下文按钮
+            isNeedClearMessage: false, // 不显示删除对话记录按钮
+            isNeedAddNewConversation: false, // 不显示新建会话按钮
             isNeedFunctionCallMessage: true,
+            // isNeedQuote: true,
             width: 1000,
           },
+          // 🎯 使用 Web Components
           uiKitCustomWebComponents: {
             JsonItem: 'demo-json-item',
           },
+          // uiKitCustomComponents: {
+          //   JsonItem: (props: any) => {
+          //     return <div>JsonItem</div>;
+          //   },
+          // },
+          // 可选：使用自定义 ContentBox
+          // contentBoxWebComponent: 'demo-content-box',
           getMessageRenderIndex: CustomJsonItem.getJSONOutputMessageRenderIndex,
           header: {
             isShow: true,
@@ -952,8 +1774,10 @@ export const WebComponentDemo = () => {
           conversations: {
             isNeed: true,
           },
+          // 🌐 在输入框右侧按钮区域添加联网开关（与文件上传按钮一起显示）
           input: {
             renderChatInputRightActions: () => {
+              // 每次调用时都同步最新的 state 到 ref，确保获取最新值
               if (
                 connectNetworkRef.current === null ||
                 connectNetworkRef.current === undefined
@@ -965,23 +1789,23 @@ export const WebComponentDemo = () => {
                 connectNetworkRef.current,
                 '(0: 不联网；1: 自动联网；2: 必须联网)',
               );
-              return (
-                <NetworkSwitchWrapper
-                  connectNetworkRef={connectNetworkRef}
-                  setConnectNetwork={value => {
-                    console.log('setConnectNetwork 被调用，新值:', value);
-                    setConnectNetwork(value);
-                    connectNetworkRef.current = value;
-                  }}
-                  clientRef={clientRef}
-                  chatType={chatType}
-                />
-              );
+              // 使用 React.createElement 确保使用正确的 React 实例，避免 hooks 错误
+              return React.createElement(NetworkSwitchWrapper, {
+                connectNetworkRef,
+                setConnectNetwork: (value: number) => {
+                  console.log('setConnectNetwork 被调用，新值:', value);
+                  setConnectNetwork(value);
+                  connectNetworkRef.current = value;
+                },
+                clientRef,
+                chatType,
+              });
             },
           },
         },
       });
 
+      // 保存客户端实例引用
       clientRef.current = client;
 
       setIsInitialized(true);
@@ -1016,10 +1840,12 @@ export const WebComponentDemo = () => {
         <h1 style={{ margin: '0 0 10px 0' }}>🎨 Web Components 示例</h1>
         <p style={{ margin: 0, opacity: 0.9, fontSize: '16px' }}>
           本示例展示如何使用 Web Components 自定义 chat-app-sdk 的 UIKit
-          组件，完全脱离 React 技术栈
+          组件，完全脱离 React 技术栈。支持通过拖拽方式配置 Schema Version
+          的渲染顺序，实现灵活的消息排序控制。
         </p>
       </div>
 
+      {/* 配置表单 */}
       {!isInitialized && (
         <div
           style={{
@@ -1035,10 +1861,74 @@ export const WebComponentDemo = () => {
             🔧 配置信息
           </h2>
           <p style={{ margin: '0 0 20px 0', color: '#666', fontSize: '14px' }}>
-            请输入以下信息以初始化聊天客户端
+            请输入以下信息以初始化聊天客户端。您还可以配置 Schema Version
+            的渲染顺序，控制不同类型消息的显示优先级。
           </p>
 
-          <div style={{ marginBottom: '20px' }}>
+          {/* 根路径信息展示 */}
+          <div
+            style={{
+              marginBottom: '20px',
+              padding: '12px 16px',
+              background: '#f8f9fa',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              fontSize: '13px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '8px',
+                fontWeight: 'bold',
+                color: '#333',
+              }}
+            >
+              <span>📍</span>
+              <span>当前路径信息</span>
+            </div>
+            <div style={{ color: '#666', lineHeight: '1.6' }}>
+              <div style={{ marginBottom: '4px' }}>
+                <strong>API 根路径：</strong>
+                <code
+                  style={{
+                    marginLeft: '8px',
+                    padding: '2px 6px',
+                    background: '#fff',
+                    border: '1px solid #ddd',
+                    borderRadius: '3px',
+                    fontFamily: 'monospace',
+                    fontSize: '12px',
+                    color: '#d63384',
+                  }}
+                >
+                  https://aiot-dev.glodon.com/api/cvforcepd/flow
+                </code>
+              </div>
+              <div>
+                <strong>当前页面：</strong>
+                <code
+                  style={{
+                    marginLeft: '8px',
+                    padding: '2px 6px',
+                    background: '#fff',
+                    border: '1px solid #ddd',
+                    borderRadius: '3px',
+                    fontFamily: 'monospace',
+                    fontSize: '12px',
+                    color: '#d63384',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {window.location.href}
+                </code>
+              </div>
+            </div>
+          </div>
+
+          {/* <div style={{ marginBottom: '20px' }}>
             <label
               style={{
                 display: 'block',
@@ -1093,7 +1983,7 @@ export const WebComponentDemo = () => {
             >
               Bot 模式：只需 Bot ID；App 模式：需要 App ID 和 Workflow ID
             </small>
-          </div>
+          </div> */}
 
           <div style={{ marginBottom: '20px' }}>
             <label
@@ -1124,7 +2014,7 @@ export const WebComponentDemo = () => {
               }}
             />
             <small style={{ color: '#999', fontSize: '12px' }}>
-              从环境变量 VITE_CHAT_APP_COZE_TOKEN 读取，或手动输入
+              从环境变量 CHAT_APP_COZE_TOKEN 读取，或手动输入
             </small>
           </div>
 
@@ -1158,7 +2048,7 @@ export const WebComponentDemo = () => {
                 }}
               />
               <small style={{ color: '#999', fontSize: '12px' }}>
-                从环境变量 VITE_CHAT_APP_INDEX_COZE_BOT_ID 读取，或使用默认值
+                从环境变量 CHAT_APP_INDEX_COZE_BOT_ID 读取，或使用默认值
               </small>
             </div>
           )}
@@ -1166,17 +2056,66 @@ export const WebComponentDemo = () => {
           {chatType === 'app' && (
             <>
               <div style={{ marginBottom: '20px' }}>
-                <label
-                  htmlFor="appid-input"
+                <div
                   style={{
-                    display: 'block',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
                     marginBottom: '8px',
-                    fontWeight: 'bold',
-                    color: '#333',
                   }}
                 >
-                  App ID<span style={{ color: 'red' }}>*</span>
-                </label>
+                  <label
+                    htmlFor="appid-input"
+                    style={{
+                      fontWeight: 'bold',
+                      color: '#333',
+                      margin: 0,
+                    }}
+                  >
+                    App ID<span style={{ color: 'red' }}>*</span>
+                  </label>
+                  {appId.trim() && (
+                    <a
+                      href={`https://aiot-dev.glodon.com/portal/gldcv/cvforcepd/fe/#/space/1758636595/project-ide/${appId.trim()}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        color: '#667eea',
+                        textDecoration: 'none',
+                        fontSize: '13px',
+                        fontWeight: 'normal',
+                        transition: 'color 0.2s',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.color = '#764ba2';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.color = '#667eea';
+                      }}
+                      title="在系统中打开 App"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        style={{ marginRight: '4px' }}
+                      >
+                        <path
+                          d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6m4-3h6v6m-11 5L21 3"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      在系统中打开
+                    </a>
+                  )}
+                </div>
                 <input
                   id="appid-input"
                   type="text"
@@ -1194,22 +2133,71 @@ export const WebComponentDemo = () => {
                   }}
                 />
                 <small style={{ color: '#999', fontSize: '12px' }}>
-                  从环境变量 VITE_CHAT_APP_CHATFLOW_COZE_APP_ID 读取
+                  从环境变量 CHAT_APP_CHATFLOW_COZE_APP_ID 读取
                 </small>
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label
-                  htmlFor="workflowid-input"
+                <div
                   style={{
-                    display: 'block',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
                     marginBottom: '8px',
-                    fontWeight: 'bold',
-                    color: '#333',
                   }}
                 >
-                  Workflow ID<span style={{ color: 'red' }}>*</span>
-                </label>
+                  <label
+                    htmlFor="workflowid-input"
+                    style={{
+                      fontWeight: 'bold',
+                      color: '#333',
+                      margin: 0,
+                    }}
+                  >
+                    Workflow ID<span style={{ color: 'red' }}>*</span>
+                  </label>
+                  {appId.trim() && workflowId.trim() && (
+                    <a
+                      href={`https://aiot-dev.glodon.com/portal/gldcv/cvforcepd/fe/#/space/1758636595/project-ide/${appId.trim()}/workflow/${workflowId.trim()}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        color: '#667eea',
+                        textDecoration: 'none',
+                        fontSize: '13px',
+                        fontWeight: 'normal',
+                        transition: 'color 0.2s',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.color = '#764ba2';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.color = '#667eea';
+                      }}
+                      title="在系统中打开 Workflow"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        style={{ marginRight: '4px' }}
+                      >
+                        <path
+                          d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6m4-3h6v6m-11 5L21 3"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      在系统中打开
+                    </a>
+                  )}
+                </div>
                 <input
                   id="workflowid-input"
                   type="text"
@@ -1227,7 +2215,7 @@ export const WebComponentDemo = () => {
                   }}
                 />
                 <small style={{ color: '#999', fontSize: '12px' }}>
-                  从环境变量 VITE_CHAT_APP_CHATFLOW_COZE_WORKFLOW_ID 读取
+                  从环境变量 CHAT_APP_CHATFLOW_COZE_WORKFLOW_ID 读取
                 </small>
               </div>
 
@@ -1259,17 +2247,23 @@ export const WebComponentDemo = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  <option value="">请选择草稿模式（可选）</option>
                   <option value="true">true - 草稿（Draft）</option>
                   <option value="false">false - 发布（Online）</option>
+                  <option value="">不设置（可选）</option>
                 </select>
                 <small style={{ color: '#999', fontSize: '12px' }}>
-                  从环境变量 VITE_CHAT_APP_DRAFT_MODE
-                  读取（可选），true=草稿，false=发布
+                  默认值为草稿模式（true）。从环境变量 CHAT_APP_DRAFT_MODE
+                  读取，true=草稿，false=发布
                 </small>
               </div>
             </>
           )}
+
+          {/* Schema Version 排序配置 */}
+          <SchemaVersionSortConfig
+            config={schemaSortConfig}
+            onChange={setSchemaSortConfig}
+          />
 
           {error ? (
             <div
@@ -1329,6 +2323,7 @@ export const WebComponentDemo = () => {
         </div>
       )}
 
+      {/* 初始化成功提示 */}
       {isInitialized ? (
         <div
           style={{
@@ -1357,25 +2352,123 @@ export const WebComponentDemo = () => {
             marginBottom: '30px',
           }}
         >
-          <h3 style={{ margin: '0 0 12px 0', color: '#856404' }}>
+          <h3 style={{ margin: '0 0 16px 0', color: '#856404' }}>
             💡 使用说明
           </h3>
-          <ol
-            style={{
-              margin: 0,
-              paddingLeft: '20px',
-              color: '#856404',
-              lineHeight: '1.8',
-            }}
-          >
-            <li>点击右下角的悬浮按钮打开聊天窗口</li>
-            <li>发送消息触发 Bot 响应</li>
-            <li>
-              如果 Bot 返回特定的 schema 数据（如搜索结果、知识库参考），将使用
-              Web Components 渲染
-            </li>
-            <li>打开浏览器控制台查看 Web Components 的生命周期日志</li>
-          </ol>
+          <div style={{ color: '#856404', lineHeight: '1.8' }}>
+            <h4
+              style={{
+                margin: '0 0 8px 0',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                color: '#856404',
+              }}
+            >
+              📝 配置步骤
+            </h4>
+            <ol
+              style={{
+                margin: '0 0 16px 0',
+                paddingLeft: '20px',
+              }}
+            >
+              <li>
+                <strong>选择聊天类型</strong>：Bot 模式或 App 模式（推荐）
+              </li>
+              <li>
+                <strong>输入访问令牌</strong>：从环境变量读取或手动输入
+              </li>
+              <li>
+                <strong>配置 ID</strong>：
+                <ul style={{ marginTop: '4px', paddingLeft: '20px' }}>
+                  <li>Bot 模式：输入 Bot ID</li>
+                  <li>
+                    App 模式：输入 App ID 和 Workflow ID，可选配置 Draft Mode
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <strong>配置 Schema Version 排序</strong>（可选）：
+                <ul style={{ marginTop: '4px', paddingLeft: '20px' }}>
+                  <li>通过拖拽调整不同 数据定义版本 的渲染顺序</li>
+                  <li>正数区域：正常顺序渲染（renderIndex: 1, 2, 3...）</li>
+                  <li>
+                    负数区域：延迟渲染，在 chat complete 后渲染（renderIndex:
+                    -1, -2, -3...）
+                  </li>
+                  <li>可以添加自定义 数据定义版本，默认项不能删除</li>
+                  <li>配置会自动保存到 localStorage</li>
+                </ul>
+              </li>
+              <li>
+                <strong>点击初始化按钮</strong>：完成客户端初始化
+              </li>
+            </ol>
+
+            <h4
+              style={{
+                margin: '0 0 8px 0',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                color: '#856404',
+              }}
+            >
+              🚀 使用功能
+            </h4>
+            <ol
+              style={{
+                margin: '0 0 16px 0',
+                paddingLeft: '20px',
+              }}
+            >
+              <li>点击右下角的悬浮按钮打开聊天窗口</li>
+              <li>发送消息触发 Bot 响应</li>
+              <li>
+                如果 Bot 返回特定的 schema
+                数据（如搜索结果、知识库参考），将使用 Web Components 渲染
+              </li>
+              <li>消息的渲染顺序由 Schema Version 排序配置决定</li>
+              <li>打开浏览器控制台查看 Web Components 的生命周期日志</li>
+            </ol>
+
+            <h4
+              style={{
+                margin: '0 0 8px 0',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                color: '#856404',
+              }}
+            >
+              🔧 Schema Version 排序配置说明
+            </h4>
+            <ul
+              style={{
+                margin: '0',
+                paddingLeft: '20px',
+              }}
+            >
+              <li>
+                <strong>拖拽排序</strong>
+                ：点击并拖拽项目到目标位置，支持同一区域内排序和跨区域移动
+              </li>
+              <li>
+                <strong>添加新项</strong>：在输入框中输入
+                数据定义版本，选择目标区域（正数/负数），点击"添加"按钮
+              </li>
+              <li>
+                <strong>删除项</strong>
+                ：点击项目右侧的"删除"按钮（默认项不能删除）
+              </li>
+              <li>
+                <strong>渲染索引</strong>：系统会根据排序自动计算
+                renderIndex，正数区域从 1 开始递增，负数区域从 -1 开始递减
+              </li>
+              <li>
+                <strong>自动保存</strong>：所有配置变更会自动保存到浏览器
+                localStorage，刷新页面后配置仍然保留
+              </li>
+            </ul>
+          </div>
         </div>
       ) : null}
 
@@ -1523,7 +2616,15 @@ export const WebComponentDemo = () => {
           )}
         </div>
       </div>
+
+      <div style={{ marginTop: '30px', textAlign: 'center', color: '#999' }}>
+        <p>
+          📖 查看更多文档：
+          <code style={{ background: '#f5f5f5', padding: '2px 6px' }}>
+            docs/WEB_COMPONENTS_GUIDE.md
+          </code>
+        </p>
+      </div>
     </div>
   );
 };
-
