@@ -57,6 +57,35 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 npm run build
 ```
 
+### Deploy to GitHub Pages
+
+项目已配置自动部署到 GitHub Pages。每次推送到 `main` 分支时，GitHub Actions 会自动构建并部署项目。
+
+**访问地址：**
+- GitHub Pages: https://aruna1990.github.io/glodon-aiot-examples/
+
+**手动部署步骤：**
+
+1. 确保 GitHub Pages 已启用：
+   - 进入仓库 Settings → Pages
+   - Source 选择 "GitHub Actions"
+
+2. 推送代码到 main 分支：
+   ```bash
+   git push origin main
+   ```
+
+3. 查看部署状态：
+   - 进入仓库 Actions 标签页
+   - 查看 "Deploy to GitHub Pages" 工作流状态
+
+**本地预览构建结果：**
+
+```bash
+npm run build
+npm run preview
+```
+
 ## Project Structure
 
 ```

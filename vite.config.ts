@@ -1,15 +1,211 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// SDK 资源文件路径
+const sdkPath = resolve(__dirname, 'node_modules/@glodon-aiot/chat-app-sdk');
+const sdkEsPath = resolve(sdkPath, 'es');
+
+// 添加 SDK 资源中间件
+function addSdkAssetsMiddleware(middlewares: any) {
+  // 拦截 SDK 资源文件请求
+  middlewares.use((req, res, next) => {
+    if (!req.url) {
+      next();
+      return;
+    }
+
+    // 匹配 SDK 的 JS chunk 文件（如 82.js, 691.js）
+    // 支持带 base 路径的请求（如 /glodon-aiot-examples/assets/82.js）
+    // 也支持不带 base 路径的请求（如 /assets/82.js）
+    const jsChunkMatch =
+      req.url.match(/\/glodon-aiot-examples\/assets\/(\d+\.js)$/) ||
+      req.url.match(/\/assets\/(\d+\.js)$/);
+    if (jsChunkMatch) {
+      const fileName = jsChunkMatch[1];
+      const filePath = resolve(sdkEsPath, fileName);
+
+      if (existsSync(filePath)) {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        res.end(readFileSync(filePath));
+        return;
+      }
+    }
+
+    // 匹配哈希文件名的资源请求（如 054000aa4e72c964.png）
+    const hashFileMatch = req.url.match(
+      /\/([a-f0-9]{32}\.(png|svg|jpg|jpeg|gif|ttf|woff|woff2|eot))$/i,
+    );
+    if (hashFileMatch) {
+      const fileName = hashFileMatch[1];
+      const filePath = resolve(sdkEsPath, fileName);
+
+      if (existsSync(filePath)) {
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        const contentType: Record<string, string> = {
+          png: 'image/png',
+          svg: 'image/svg+xml',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          gif: 'image/gif',
+          ttf: 'font/ttf',
+          woff: 'font/woff',
+          woff2: 'font/woff2',
+          eot: 'application/vnd.ms-fontobject',
+        };
+        res.setHeader(
+          'Content-Type',
+          contentType[ext || ''] || 'application/octet-stream',
+        );
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        res.end(readFileSync(filePath));
+        return;
+      }
+    }
+
+    // 匹配 node_modules 路径的资源请求
+    const nodeModulesMatch = req.url.match(
+      /\/node_modules\/@glodon-aiot\/chat-app-sdk\/es\/(.+)$/,
+    );
+    if (nodeModulesMatch) {
+      const fileName = nodeModulesMatch[1];
+      const filePath = resolve(sdkEsPath, fileName);
+
+      if (existsSync(filePath)) {
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        const contentType: Record<string, string> = {
+          png: 'image/png',
+          svg: 'image/svg+xml',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          gif: 'image/gif',
+          ttf: 'font/ttf',
+          woff: 'font/woff',
+          woff2: 'font/woff2',
+          eot: 'application/vnd.ms-fontobject',
+          js: 'application/javascript',
+        };
+        res.setHeader(
+          'Content-Type',
+          contentType[ext || ''] || 'application/octet-stream',
+        );
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        res.end(readFileSync(filePath));
+        return;
+      }
+    }
+
+    next();
+  });
+}
+
+// 创建插件来处理开发环境和预览模式下的 SDK 资源文件
+function sdkAssetsDevPlugin(): Plugin {
+  return {
+    name: 'sdk-assets-dev-plugin',
+    configureServer(server) {
+      // 开发环境处理
+      addSdkAssetsMiddleware(server.middlewares);
+    },
+    configurePreviewServer(server) {
+      // 预览模式处理
+      addSdkAssetsMiddleware(server.middlewares);
+    },
+  };
+}
+
+// 获取 SDK es 目录中的所有资源文件
+function getSdkAssets(): Array<{ src: string; dest: string }> {
+  if (!existsSync(sdkEsPath)) {
+    return [];
+  }
+
+  const assets: Array<{ src: string; dest: string }> = [];
+  const files = readdirSync(sdkEsPath);
+
+  files.forEach(file => {
+    const filePath = resolve(sdkEsPath, file);
+    const stat = statSync(filePath);
+
+    if (stat.isFile()) {
+      const ext = file.split('.').pop()?.toLowerCase();
+      // 复制资源文件和 JS chunk 文件（排除主入口文件）
+      if (
+        [
+          'png',
+          'svg',
+          'jpg',
+          'jpeg',
+          'gif',
+          'ttf',
+          'woff',
+          'woff2',
+          'eot',
+          'js', // 包含 JS chunk 文件
+        ].includes(ext || '') &&
+        file !== 'index.esm.js' && // 排除主入口文件
+        file !== 'ui.esm.js' // 排除 UI 入口文件
+      ) {
+        assets.push({
+          src: `node_modules/@glodon-aiot/chat-app-sdk/es/${file}`, // 相对路径
+          dest: 'assets', // 复制到 dist/assets 目录
+        });
+      }
+    }
+  });
+
+  return assets;
+}
+
 export default defineConfig({
-  plugins: [react()],
+  // GitHub Pages 部署需要设置 base 路径
+  base: process.env.NODE_ENV === 'production' ? '/glodon-aiot-examples/' : '/',
+  plugins: [
+    react(),
+    sdkAssetsDevPlugin(), // 开发环境资源处理插件
+    // 构建时复制 SDK 资源文件到 dist 目录
+    viteStaticCopy({
+      targets: getSdkAssets(),
+    }),
+  ],
   resolve: {
     // 使用 node_modules 中的包，不配置任何外部源码别名
+  },
+  // 配置资源处理：确保所有静态资源文件被正确处理
+  assetsInclude: [
+    '**/*.svg',
+    '**/*.png',
+    '**/*.jpg',
+    '**/*.jpeg',
+    '**/*.gif',
+    '**/*.ttf',
+    '**/*.woff',
+    '**/*.woff2',
+    '**/*.eot',
+  ],
+  // 配置依赖优化：配置 esbuild 如何处理资源文件
+  optimizeDeps: {
+    esbuildOptions: {
+      loader: {
+        // 将所有静态资源文件作为文件资源处理
+        '.svg': 'file',
+        '.png': 'file',
+        '.jpg': 'file',
+        '.jpeg': 'file',
+        '.gif': 'file',
+        '.ttf': 'file',
+        '.woff': 'file',
+        '.woff2': 'file',
+        '.eot': 'file',
+      },
+    },
   },
   server: {
     port: 3000,
@@ -32,5 +228,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      // 确保正确处理 node_modules 中的 SVG 文件
+      output: {
+        assetFileNames: assetInfo => {
+          // SVG 文件保持原文件名
+          if (assetInfo.name && assetInfo.name.endsWith('.svg')) {
+            return 'assets/[name][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
+        },
+      },
+    },
   },
 });
