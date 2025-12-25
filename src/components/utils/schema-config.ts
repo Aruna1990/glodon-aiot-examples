@@ -18,6 +18,12 @@ const DEFAULT_CONFIG: SortConfig = {
   negative: [{ schemaVersion: 'cvforce.search.result.v1', renderIndex: -1 }],
 };
 
+// 默认的 数据定义版本（不能删除）
+export const DEFAULT_SCHEMA_VERSIONS = [
+  'cvforce.knowledge.refrence.v1',
+  'cvforce.search.result.v1',
+];
+
 // localStorage 工具函数
 export const loadConfigFromStorage = (): SortConfig => {
   try {
@@ -38,5 +44,26 @@ export const loadConfigFromStorage = (): SortConfig => {
     console.error('Failed to load config from localStorage:', e);
   }
   return DEFAULT_CONFIG;
+};
+
+export const saveConfigToStorage = (config: SortConfig): void => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.error('Failed to save config to localStorage:', e);
+  }
+};
+
+// 重新计算 renderIndex（基于顺序）
+export const recalculateRenderIndices = (config: SortConfig): SortConfig => {
+  const positive = config.positive.map((item, index) => ({
+    ...item,
+    renderIndex: index + 1, // 1, 2, 3...
+  }));
+  const negative = config.negative.map((item, index) => ({
+    ...item,
+    renderIndex: -(index + 1), // -1, -2, -3...
+  }));
+  return { positive, negative };
 };
 

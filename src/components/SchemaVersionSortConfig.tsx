@@ -1,0 +1,529 @@
+import React, { useState } from 'react';
+import type { SchemaVersionConfig, SortConfig } from './utils/schema-config';
+import {
+  DEFAULT_SCHEMA_VERSIONS,
+  recalculateRenderIndices,
+} from './utils/schema-config';
+
+export const SchemaVersionSortConfig = ({
+  config,
+  onChange,
+}: {
+  config: SortConfig;
+  onChange: (config: SortConfig) => void;
+}) => {
+  const [draggedItem, setDraggedItem] = useState<{
+    schemaVersion: string;
+    sourceArea: 'positive' | 'negative';
+    index: number;
+  } | null>(null);
+  const [newSchemaVersion, setNewSchemaVersion] = useState('');
+  const [newSchemaArea, setNewSchemaArea] = useState<'positive' | 'negative'>(
+    'positive',
+  );
+
+  const handleDragStart = (
+    e: React.DragEvent,
+    dragInfo: {
+      schemaVersion: string;
+      area: 'positive' | 'negative';
+      index: number;
+    },
+  ) => {
+    setDraggedItem({
+      schemaVersion: dragInfo.schemaVersion,
+      sourceArea: dragInfo.area,
+      index: dragInfo.index,
+    });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', ''); // 某些浏览器需要这个
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (
+    e: React.DragEvent,
+    targetArea: 'positive' | 'negative',
+    targetIndex: number,
+  ) => {
+    e.preventDefault();
+    if (!draggedItem) {
+      return;
+    }
+
+    // 防止拖拽到自己身上（同一位置）
+    if (
+      draggedItem.sourceArea === targetArea &&
+      draggedItem.index === targetIndex
+    ) {
+      setDraggedItem(null);
+      return;
+    }
+
+    const newConfig = { ...config };
+
+    if (draggedItem.sourceArea === targetArea) {
+      // 同一区域内移动：直接操作同一个数组
+      const list = [...newConfig[targetArea]];
+      const [removed] = list.splice(draggedItem.index, 1);
+
+      // 如果目标索引大于源索引，需要减1（因为源项已被移除）
+      const adjustedIndex =
+        targetIndex > draggedItem.index ? targetIndex - 1 : targetIndex;
+
+      // 确保索引在有效范围内
+      const finalIndex = Math.max(0, Math.min(adjustedIndex, list.length));
+      list.splice(finalIndex, 0, removed);
+
+      newConfig[targetArea] = list;
+    } else {
+      // 跨区域移动：操作两个不同的数组
+      const sourceList = [...newConfig[draggedItem.sourceArea]];
+      const targetList = [...newConfig[targetArea]];
+
+      // 从源列表移除
+      const [removed] = sourceList.splice(draggedItem.index, 1);
+
+      // 确保目标索引在有效范围内
+      const finalIndex = Math.max(0, Math.min(targetIndex, targetList.length));
+      targetList.splice(finalIndex, 0, removed);
+
+      newConfig[draggedItem.sourceArea] = sourceList;
+      newConfig[targetArea] = targetList;
+    }
+
+    // 去重：确保同一个 数据定义版本 在同一个区域内只出现一次
+    const deduplicatedConfig: SortConfig = {
+      positive: [],
+      negative: [],
+    };
+
+    // 去重正数区域
+    const seenPositive = new Set<string>();
+    for (const item of newConfig.positive) {
+      if (!seenPositive.has(item.schemaVersion)) {
+        seenPositive.add(item.schemaVersion);
+        deduplicatedConfig.positive.push(item);
+      }
+    }
+
+    // 去重负数区域
+    const seenNegative = new Set<string>();
+    for (const item of newConfig.negative) {
+      if (!seenNegative.has(item.schemaVersion)) {
+        seenNegative.add(item.schemaVersion);
+        deduplicatedConfig.negative.push(item);
+      }
+    }
+
+    // 重新计算索引并保存
+    const recalculated = recalculateRenderIndices(deduplicatedConfig);
+    onChange(recalculated);
+    setDraggedItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+  };
+
+  const handleAdd = () => {
+    if (!newSchemaVersion.trim()) {
+      alert('请输入 数据定义版本');
+      return;
+    }
+
+    // 检查是否已存在
+    const existsInPositive = config.positive.some(
+      item => item.schemaVersion === newSchemaVersion.trim(),
+    );
+    const existsInNegative = config.negative.some(
+      item => item.schemaVersion === newSchemaVersion.trim(),
+    );
+
+    if (existsInPositive || existsInNegative) {
+      alert('该 数据定义版本 已存在');
+      return;
+    }
+
+    const newConfig = { ...config };
+    const newItem: SchemaVersionConfig = {
+      schemaVersion: newSchemaVersion.trim(),
+      renderIndex: newSchemaArea === 'positive' ? 1 : -1,
+    };
+
+    if (newSchemaArea === 'positive') {
+      newConfig.positive.push(newItem);
+    } else {
+      newConfig.negative.push(newItem);
+    }
+
+    const recalculated = recalculateRenderIndices(newConfig);
+    onChange(recalculated);
+    setNewSchemaVersion('');
+  };
+
+  const handleDelete = (
+    schemaVersion: string,
+    area: 'positive' | 'negative',
+  ) => {
+    if (DEFAULT_SCHEMA_VERSIONS.includes(schemaVersion)) {
+      alert('默认的 数据定义版本 不能删除');
+      return;
+    }
+
+    const newConfig = { ...config };
+    newConfig[area] = newConfig[area].filter(
+      item => item.schemaVersion !== schemaVersion,
+    );
+
+    const recalculated = recalculateRenderIndices(newConfig);
+    onChange(recalculated);
+  };
+
+  const renderItem = (
+    item: SchemaVersionConfig,
+    area: 'positive' | 'negative',
+    index: number,
+  ) => {
+    const isDefault = DEFAULT_SCHEMA_VERSIONS.includes(item.schemaVersion);
+    const isDragging =
+      draggedItem?.schemaVersion === item.schemaVersion &&
+      draggedItem?.sourceArea === area;
+
+    return (
+      <div key={`${area}-${index}`}>
+        {/* 拖拽插入区域（在项之前） */}
+        <div
+          onDragOver={handleDragOver}
+          onDrop={e => handleDrop(e, area, index)}
+          style={{
+            height: '8px',
+            marginBottom: '4px',
+            borderRadius: '4px',
+            background: draggedItem ? 'transparent' : 'transparent',
+            transition: 'background 0.2s',
+          }}
+          onDragEnter={e => {
+            if (draggedItem) {
+              e.currentTarget.style.background = '#2196f3';
+              e.currentTarget.style.height = '4px';
+            }
+          }}
+          onDragLeave={e => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.height = '8px';
+          }}
+        />
+        <div
+          draggable
+          onDragStart={e =>
+            handleDragStart(e, {
+              schemaVersion: item.schemaVersion,
+              area,
+              index,
+            })
+          }
+          onDragOver={handleDragOver}
+          onDrop={e => handleDrop(e, area, index + 1)}
+          onDragEnd={handleDragEnd}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px',
+            marginBottom: '8px',
+            background: isDragging
+              ? '#e3f2fd'
+              : area === 'positive'
+                ? '#f1f8e9'
+                : '#fff3e0',
+            border: `2px solid ${
+              isDragging
+                ? '#2196f3'
+                : area === 'positive'
+                  ? '#8bc34a'
+                  : '#ff9800'
+            }`,
+            borderRadius: '6px',
+            cursor: 'move',
+            opacity: isDragging ? 0.5 : 1,
+            transition: 'all 0.2s',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '18px',
+              userSelect: 'none',
+              cursor: 'grab',
+            }}
+          >
+            ⋮⋮
+          </div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '14px',
+                color: '#333',
+                marginBottom: '4px',
+              }}
+            >
+              {item.schemaVersion}
+              {isDefault ? (
+                <span
+                  style={{
+                    marginLeft: '8px',
+                    fontSize: '12px',
+                    color: '#666',
+                    fontWeight: 'normal',
+                  }}
+                >
+                  (默认)
+                </span>
+              ) : null}
+            </div>
+            <div
+              style={{
+                fontSize: '12px',
+                color: '#666',
+              }}
+            >
+              渲染索引: {item.renderIndex}
+            </div>
+          </div>
+          <button
+            onClick={() => handleDelete(item.schemaVersion, area)}
+            disabled={isDefault}
+            style={{
+              padding: '4px 8px',
+              background: isDefault ? '#f5f5f5' : '#ff4d4f',
+              color: isDefault ? '#999' : 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isDefault ? 'not-allowed' : 'pointer',
+              fontSize: '12px',
+              opacity: isDefault ? 0.5 : 1,
+            }}
+            title={isDefault ? '默认项不能删除' : '删除'}
+          >
+            删除
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div
+      style={{
+        background: 'white',
+        border: '2px solid #667eea',
+        borderRadius: '12px',
+        padding: '20px',
+        marginBottom: '20px',
+      }}
+    >
+      <h3
+        style={{
+          margin: '0 0 16px 0',
+          color: '#667eea',
+          fontSize: '18px',
+        }}
+      >
+        📋 Schema Version 排序配置
+      </h3>
+      <p
+        style={{
+          margin: '0 0 20px 0',
+          color: '#666',
+          fontSize: '13px',
+        }}
+      >
+        拖拽项目调整顺序，负数区域表示延迟渲染（在 chat complete 后渲染）
+      </p>
+
+      {/* 添加新项 */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '20px',
+          padding: '12px',
+          background: '#f8f9fa',
+          borderRadius: '6px',
+        }}
+      >
+        <input
+          type="text"
+          value={newSchemaVersion}
+          onChange={e => setNewSchemaVersion(e.target.value)}
+          placeholder="输入 数据定义版本"
+          style={{
+            flex: 1,
+            padding: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '14px',
+          }}
+          onKeyPress={e => {
+            if (e.key === 'Enter') {
+              handleAdd();
+            }
+          }}
+        />
+        <select
+          value={newSchemaArea}
+          onChange={e =>
+            setNewSchemaArea(e.target.value as 'positive' | 'negative')
+          }
+          style={{
+            padding: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '14px',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="positive">正数区域</option>
+          <option value="negative">负数区域</option>
+        </select>
+        <button
+          onClick={handleAdd}
+          style={{
+            padding: '8px 16px',
+            background: '#667eea',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold',
+          }}
+        >
+          添加
+        </button>
+      </div>
+
+      {/* 两个区域 */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '20px',
+        }}
+      >
+        {/* 正数区域 */}
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px',
+              padding: '8px',
+              background: '#e8f5e9',
+              borderRadius: '6px',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>✅</span>
+            <span
+              style={{
+                fontWeight: 'bold',
+                color: '#2e7d32',
+                fontSize: '14px',
+              }}
+            >
+              正数区域（正常渲染）
+            </span>
+          </div>
+          <div
+            onDragOver={handleDragOver}
+            onDrop={e => handleDrop(e, 'positive', config.positive.length)}
+            style={{
+              minHeight: '100px',
+              padding: '12px',
+              background: '#f1f8e9',
+              borderRadius: '6px',
+              border: '2px dashed #8bc34a',
+            }}
+          >
+            {config.positive.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  color: '#999',
+                  fontSize: '13px',
+                  padding: '20px',
+                }}
+              >
+                拖拽项目到这里
+              </div>
+            ) : (
+              config.positive.map((item, index) =>
+                renderItem(item, 'positive', index),
+              )
+            )}
+          </div>
+        </div>
+
+        {/* 负数区域 */}
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px',
+              padding: '8px',
+              background: '#fff3e0',
+              borderRadius: '6px',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>⏳</span>
+            <span
+              style={{
+                fontWeight: 'bold',
+                color: '#e65100',
+                fontSize: '14px',
+              }}
+            >
+              负数区域（延迟渲染）
+            </span>
+          </div>
+          <div
+            onDragOver={handleDragOver}
+            onDrop={e => handleDrop(e, 'negative', config.negative.length)}
+            style={{
+              minHeight: '100px',
+              padding: '12px',
+              background: '#fff3e0',
+              borderRadius: '6px',
+              border: '2px dashed #ff9800',
+            }}
+          >
+            {config.negative.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  color: '#999',
+                  fontSize: '13px',
+                  padding: '20px',
+                }}
+              >
+                拖拽项目到这里
+              </div>
+            ) : (
+              config.negative.map((item, index) =>
+                renderItem(item, 'negative', index),
+              )
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+

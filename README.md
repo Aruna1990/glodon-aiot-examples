@@ -91,7 +91,8 @@ npm run preview
 ```
 src/
 ├── components/
-│   ├── WebComponentDemo.tsx      # Main demo component
+│   ├── WebComponentDemo/
+│   │   └── index.tsx              # Main demo component
 │   ├── search-result-list.ts      # Search result Web Component
 │   ├── knowledge-reference-list.ts # Knowledge reference Web Component
 │   └── index.ts                   # Exports
