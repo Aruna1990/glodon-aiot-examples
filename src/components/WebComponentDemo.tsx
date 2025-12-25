@@ -1,16 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-// import {
-//   AuthType,
-//   ChatType,
-//   Language,
-//   Layout,
-// } from '@coze-studio/open-chat/types';
-
-// 使用动态导入延迟加载 SDK，减少初始 bundle 大小
-// import { WebChatClient } from '@glodon-aiot/chat-app-sdk';
-
 import { SearchResultList } from './search-result-list';
 import { KnowledgeReferenceList } from './knowledge-reference-list';
 
