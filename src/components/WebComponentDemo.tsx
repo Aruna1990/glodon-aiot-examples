@@ -24,6 +24,7 @@ import {
   Layout,
 } from '@coze-studio/open-chat/types';
 
+// @ts-ignore - Path alias resolved by vite.config.ts and tsconfig.json
 import { WebChatClient } from '@glodon-aiot/chat-app-sdk';
 
 import { SearchResultList, KnowledgeReferenceList } from './index';
