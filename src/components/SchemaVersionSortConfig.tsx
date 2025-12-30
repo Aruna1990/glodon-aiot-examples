@@ -464,7 +464,7 @@ export const SchemaVersionSortConfig = ({
             ) : (
               [...config.positive]
                 .sort((a, b) => b.renderIndex - a.renderIndex) // renderIndex 越大越靠上
-                .map((item, sortedIndex) => {
+                .map(item => {
                   // 查找原始数组中的索引，用于拖拽操作
                   const originalIndex = config.positive.findIndex(
                     origItem => origItem.schemaVersion === item.schemaVersion,
