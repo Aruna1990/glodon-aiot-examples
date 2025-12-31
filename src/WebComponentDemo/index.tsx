@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 import { CustomJsonItem } from '../components/CustomJsonItem';
 import type { SortConfig } from '../components/utils/schema-config';
@@ -144,8 +144,9 @@ export const WebComponentDemo = () => {
         env: 'test',
         apiUrl: 'https://aiot-dev.glodon.com/api/cvforcepd/flow',
         config,
+
         auth: {
-          type: 'token',
+          type: 'token' as const,
           token: token.trim(),
           onRefreshToken: () => token.trim(),
         },
@@ -173,6 +174,7 @@ export const WebComponentDemo = () => {
             // isNeedQuote: true,
             width: 1000,
           },
+          showUserInfo: false, // 不显示消息头像
           // 🎯 使用 Web Components
           uiKitCustomWebComponents: {
             JsonItem: 'demo-json-item',
@@ -208,17 +210,18 @@ export const WebComponentDemo = () => {
                 connectNetworkRef.current,
                 '(0: 不联网；1: 自动联网；2: 必须联网)',
               );
-              // 使用 React.createElement 确保使用正确的 React 实例，避免 hooks 错误
-              return React.createElement(NetworkSwitchWrapper, {
-                connectNetworkRef,
-                setConnectNetwork: (value: number) => {
-                  console.log('setConnectNetwork 被调用，新值:', value);
-                  setConnectNetwork(value);
-                  connectNetworkRef.current = value;
-                },
-                clientRef,
-                chatType,
-              });
+              return (
+                <NetworkSwitchWrapper
+                  connectNetworkRef={connectNetworkRef}
+                  setConnectNetwork={value => {
+                    console.log('setConnectNetwork 被调用，新值:', value);
+                    setConnectNetwork(value);
+                    connectNetworkRef.current = value;
+                  }}
+                  clientRef={clientRef}
+                  chatType={chatType}
+                />
+              );
             },
             inputMode: 'multi-line',
           },

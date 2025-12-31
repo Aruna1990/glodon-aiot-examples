@@ -77,6 +77,11 @@ declare module '@glodon-aiot/chat-app-sdk' {
       footer?: {
         isShow?: boolean;
       };
+      /**
+       * 是否显示消息头像
+       * @default false
+       */
+      showUserInfo?: boolean;
     };
     getContainer?: () => HTMLElement;
     mode?: 'float' | 'embed';
