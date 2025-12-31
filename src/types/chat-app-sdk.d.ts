@@ -53,6 +53,9 @@ declare module '@glodon-aiot/chat-app-sdk' {
       header?: {
         isShow?: boolean;
         isNeedClose?: boolean;
+        isNeedLogo?: boolean; // 是否显示 logo/icon，默认为 true
+        icon?: string; // logo/icon 的 URL，如果设置则覆盖 base.icon
+        extra?: ReactNode | false; // 用于站位的，默认无
       };
       conversations?: {
         isNeed?: boolean;
@@ -63,6 +66,16 @@ declare module '@glodon-aiot/chat-app-sdk' {
         isShow?: boolean;
         defaultText?: string;
         isNeedAudio?: boolean;
+        /**
+         * 输入框模式：'single-line' | 'multi-line'
+         * 'single-line': 单行模式，按钮在右侧
+         * 'multi-line': 多行模式，发送按钮在右下角，其他辅助按钮在左下角
+         * 默认值：根据 textarea 高度自动检测（保持向后兼容）
+         */
+        inputMode?: 'single-line' | 'multi-line';
+      };
+      footer?: {
+        isShow?: boolean;
       };
     };
     getContainer?: () => HTMLElement;
