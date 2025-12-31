@@ -150,6 +150,7 @@ function fixSdkDynamicImportsPlugin(): Plugin {
       );
 
       if (!chatSdkChunk) {
+        console.warn('⚠️ chat-sdk chunk not found in bundle');
         return;
       }
 
@@ -165,15 +166,111 @@ function fixSdkDynamicImportsPlugin(): Plugin {
 
       // 修复 __webpack_require__.p（public path）的设置
       // 这是最关键的修复：确保 public path 指向正确的 base path
-      // 匹配：__webpack_require__.p = scriptUrl (或压缩后的变量名)
-      // 替换为：__webpack_require__.p = "${basePath}assets/"
-      const publicPathPattern =
-        /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*scriptUrl/g;
-      if (publicPathPattern.test(content)) {
-        content = content.replace(
-          publicPathPattern,
-          `$1 = "${basePath}assets/"`,
-        );
+      // 匹配多种可能的格式：
+      // - __webpack_require__.p = scriptUrl
+      // - a.p = scriptUrl (压缩后)
+      // - __webpack_require__.p = scriptUrl.replace(...)
+      // - Te.p = a (其中 a 是从 import.meta.url 计算出来的)
+      const publicPathPatterns = [
+        // 匹配：变量名.p = scriptUrl
+        /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*scriptUrl/g,
+        // 匹配：变量名.p = scriptUrl.replace(...)
+        /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*scriptUrl\s*\.\s*replace\([^)]+\)/g,
+        // 匹配：变量名.p = a (其中 a 是从 import.meta.url 计算出来的，如 Te.p = a)
+        // 这个模式匹配类似：Te.p=a})();(()=>{Te.b=new URL("./",import.meta.url)
+        /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*[a-zA-Z_$][a-zA-Z0-9_$]*\s*\}\)\s*\)\s*\(\s*\)\s*;\s*\(\s*\(\s*\)\s*=>\s*\{[^}]*new URL\(["']\.\/["'],\s*import\.meta\.url\)/g,
+        // 更简单的模式：匹配 .p = 变量名，后面跟着 import.meta.url
+        /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*[a-zA-Z_$][a-zA-Z0-9_$]*(?=[^}]*import\.meta\.url)/g,
+      ];
+
+      // 首先尝试匹配 Te.p = a 的模式（从 import.meta.url 计算）
+      // 匹配模式：Te.p=a})();(()=>{Te.b=new URL("./",import.meta.url
+      // 我们需要找到 .p = 变量名，后面跟着 import.meta.url 的模式
+      const tePattern =
+        /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*[a-zA-Z_$][a-zA-Z0-9_$]*\}\)\s*\)\s*\(\s*\)\s*;\s*\(\s*\(\s*\)\s*=>\s*\{[^}]*new URL\(["']\.\/["'],\s*import\.meta\.url\)/;
+      if (tePattern.test(content)) {
+        content = content.replace(tePattern, (match, varName) => {
+          return `${varName} = "${basePath}assets/"`;
+        });
+        modified = true;
+      }
+
+      // 更简单的模式：匹配任何 .p = 变量名，如果后面有 import.meta.url
+      // 使用更宽松的匹配，查找 .p = 变量名，然后检查后面是否有 import.meta.url
+      const simpleTePattern =
+        /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+      const allPMatches2 = content.match(simpleTePattern);
+      if (allPMatches2) {
+        // 检查每个匹配后面是否有 import.meta.url
+        for (const match of allPMatches2) {
+          const matchIndex = content.indexOf(match);
+          const afterMatch = content.substring(
+            matchIndex + match.length,
+            matchIndex + match.length + 500,
+          );
+          if (afterMatch.includes('import.meta.url')) {
+            const varNameMatch = match.match(
+              /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*[a-zA-Z_$][a-zA-Z0-9_$]*/,
+            );
+            if (varNameMatch) {
+              const varName = varNameMatch[1];
+              // 替换这个特定的匹配
+              content = content.replace(
+                new RegExp(
+                  `(${varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\s*=\\s*[a-zA-Z_$][a-zA-Z0-9_$]*`,
+                ),
+                `${varName} = "${basePath}assets/"`,
+              );
+              modified = true;
+              break; // 只替换第一个匹配
+            }
+          }
+        }
+      }
+
+      // 然后尝试匹配其他模式
+      publicPathPatterns.forEach((pattern, index) => {
+        if (pattern.test(content)) {
+          content = content.replace(pattern, (match, varName) => {
+            return `${varName} = "${basePath}assets/"`;
+          });
+          modified = true;
+        }
+      });
+
+      // 如果上面的模式都没有匹配到，尝试直接查找并设置所有 .p 变量
+      // 匹配：变量名.p = ... (任何赋值)
+      const anyPPattern = /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*[^;]+/g;
+      const allPMatches = content.match(anyPPattern);
+
+      // 如果找到了 .p 的赋值，但还没有被修复，尝试直接替换
+      if (allPMatches && allPMatches.length > 0 && !modified) {
+        // 找到第一个 .p 的变量名
+        const firstPMatch = content.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\.p\s*=/);
+        if (firstPMatch) {
+          const varName = firstPMatch[1];
+          // 替换所有该变量的 .p 赋值
+          const specificPPattern = new RegExp(
+            `(${varName}\\.p)\\s*=\\s*[^;]+`,
+            'g',
+          );
+          content = content.replace(specificPPattern, (match, pVar) => {
+            return `${pVar} = "${basePath}assets/"`;
+          });
+          modified = true;
+        }
+      }
+
+      // 如果上面的模式都没有匹配到，尝试直接查找并替换 undefined 的情况
+      // 匹配：变量名.p + ... 但变量名.p 是 undefined
+      const undefinedPattern = /import\("undefined([^"]+)"\)/g;
+      if (undefinedPattern.test(content)) {
+        content = content.replace(undefinedPattern, (match, path) => {
+          // 找到第一个 .p 的变量名
+          const pMatch = content.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\.p\s*=/);
+          const webpackRequireName = pMatch ? pMatch[1] : '__webpack_require__';
+          return `import(${webpackRequireName}.p + "${path}")`;
+        });
         modified = true;
       }
 
@@ -190,6 +287,45 @@ function fixSdkDynamicImportsPlugin(): Plugin {
           const pMatch = content.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\.p\s*=/);
           const webpackRequireName = pMatch ? pMatch[1] : '__webpack_require__';
           return `import(${webpackRequireName}.p + ${pathExpr})`;
+        });
+        modified = true;
+      }
+
+      // 修复 Te.f.j 函数中的动态导入：将 e.p 替换为 Te.p（或找到的变量名）
+      // 匹配：import(e.p + Te.u(o)) 或 import(e.p + ...)
+      // 问题：e.p 可能是 undefined，导致 import("undefined82.js")
+      // 解决：将 e.p 替换为 Te.p（或找到的变量名）
+      const dynamicImportEPattern =
+        /import\(([a-zA-Z_$][a-zA-Z0-9_$]*)\.p\s*\+\s*([^)]+)\)/g;
+      if (dynamicImportEPattern.test(content)) {
+        // 找到 Te 变量名（或第一个 .p 的变量名，且已设置为正确的值）
+        const teMatch = content.match(
+          /([a-zA-Z_$][a-zA-Z0-9_$]*)\.p\s*=\s*"[^"]+"/,
+        );
+        const teVarName = teMatch ? teMatch[1] : 'Te';
+
+        content = content.replace(
+          dynamicImportEPattern,
+          (match, varName, rest) => {
+            // 如果 varName 不是 Te（或找到的变量名），替换为 Te（或找到的变量名）
+            // 这样可以确保使用正确的 publicPath
+            if (varName !== teVarName) {
+              return `import(${teVarName}.p + ${rest})`;
+            }
+            return match;
+          },
+        );
+        modified = true;
+      }
+
+      // 修复 undefined 的情况：import("undefined82.js") -> import(__webpack_require__.p + "82.js")
+      const undefinedImportPattern = /import\("undefined([^"]+)"\)/g;
+      if (undefinedImportPattern.test(content)) {
+        content = content.replace(undefinedImportPattern, (match, path) => {
+          // 找到第一个 .p 的变量名
+          const pMatch = content.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\.p\s*=/);
+          const webpackRequireName = pMatch ? pMatch[1] : '__webpack_require__';
+          return `import(${webpackRequireName}.p + "${path}")`;
         });
         modified = true;
       }
