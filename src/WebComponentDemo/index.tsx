@@ -113,7 +113,7 @@ export const WebComponentDemo = () => {
       console.log('✅ SDK loaded successfully');
       // 构建配置对象
       const config: any = {
-        type: chatType,
+        type: chatType === 'app' ? 'app' : undefined,
       };
 
       if (chatType === 'bot') {
@@ -159,6 +159,7 @@ export const WebComponentDemo = () => {
             lang: 'zh-CN',
             layout: 'pc',
             zIndex: 1000,
+            icon: 'https://minio-dev.glodon.com/opencoze/default_icon/default_agent_icon.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=IELEY0R9LRLA4IQI60T1%2F20251231%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20251231T033702Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=8760f1429d02997191248194fd15228b61f91a1e6e71a12b2d2a2fd3d96c8eca',
           },
           asstBtn: {
             isNeed: true,
@@ -186,7 +187,8 @@ export const WebComponentDemo = () => {
           getMessageRenderIndex: CustomJsonItem.getJSONOutputMessageRenderIndex,
           header: {
             isShow: true,
-            isNeedClose: true,
+            isNeedClose: false,
+            isNeedLogo: true, // 显示 header 中的 icon
           },
           conversations: {
             isNeed: true,
@@ -218,6 +220,10 @@ export const WebComponentDemo = () => {
                 chatType,
               });
             },
+            inputMode: 'multi-line',
+          },
+          footer: {
+            isShow: false,
           },
         },
       });
