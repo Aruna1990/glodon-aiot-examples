@@ -3,7 +3,13 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import {
+  readFileSync,
+  existsSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'fs';
 import { splitVendorChunkPlugin } from 'vite';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -122,6 +128,81 @@ function sdkAssetsDevPlugin(): Plugin {
   };
 }
 
+// 创建插件来修复 SDK 中的动态导入路径（用于 GitHub Pages）
+// 注意：SDK 已在 build-esm.config.ts 中添加了 publicPath: 'auto'，理论上应该自动处理路径问题
+// 此插件作为后备方案，如果 SDK 修复后验证通过，可以移除此插件
+function fixSdkDynamicImportsPlugin(): Plugin {
+  const basePath =
+    process.env.NODE_ENV === 'production' ? '/glodon-aiot-examples/' : '/';
+
+  return {
+    name: 'fix-sdk-dynamic-imports',
+    writeBundle(options, bundle) {
+      // 只在生产环境处理
+      if (process.env.NODE_ENV !== 'production' || basePath === '/') {
+        return;
+      }
+
+      // 查找 chat-sdk chunk 文件
+      const chatSdkChunk = Object.keys(bundle).find(
+        fileName =>
+          fileName.startsWith('assets/chat-sdk-') && fileName.endsWith('.js'),
+      );
+
+      if (!chatSdkChunk) {
+        return;
+      }
+
+      const filePath = resolve(options.dir || 'dist', chatSdkChunk);
+
+      if (!existsSync(filePath)) {
+        return;
+      }
+
+      // 读取文件内容
+      let content = readFileSync(filePath, 'utf-8');
+      let modified = false;
+
+      // 修复 __webpack_require__.p（public path）的设置
+      // 这是最关键的修复：确保 public path 指向正确的 base path
+      // 匹配：__webpack_require__.p = scriptUrl (或压缩后的变量名)
+      // 替换为：__webpack_require__.p = "${basePath}assets/"
+      const publicPathPattern =
+        /([a-zA-Z_$][a-zA-Z0-9_$]*\.p)\s*=\s*scriptUrl/g;
+      if (publicPathPattern.test(content)) {
+        content = content.replace(
+          publicPathPattern,
+          `$1 = "${basePath}assets/"`,
+        );
+        modified = true;
+      }
+
+      // 修复动态导入路径：将 import("./" + ...) 替换为使用 __webpack_require__.p
+      // 匹配模式：import("./" + ...)
+      // 替换为：import(__webpack_require__.p + ...)
+      // 这样可以确保使用正确的 public path
+      const importPattern = /import\("\.\/"\s*\+\s*([^)]+)\)/g;
+      if (importPattern.test(content)) {
+        content = content.replace(importPattern, (match, pathExpr) => {
+          // 提取路径表达式，使用 __webpack_require__.p 作为前缀
+          // 需要找到 __webpack_require__ 的变量名（可能是压缩后的）
+          // 先尝试找到 .p 的变量名
+          const pMatch = content.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)\.p\s*=/);
+          const webpackRequireName = pMatch ? pMatch[1] : '__webpack_require__';
+          return `import(${webpackRequireName}.p + ${pathExpr})`;
+        });
+        modified = true;
+      }
+
+      // 如果修改了内容，写入文件
+      if (modified) {
+        writeFileSync(filePath, content, 'utf-8');
+        console.log(`✅ Fixed dynamic import paths in ${chatSdkChunk}`);
+      }
+    },
+  };
+}
+
 // 获取 SDK es 目录中的所有资源文件
 function getSdkAssets(): Array<{ src: string; dest: string }> {
   if (!existsSync(sdkEsPath)) {
@@ -177,6 +258,8 @@ export default defineConfig({
     viteStaticCopy({
       targets: getSdkAssets(),
     }),
+    // 修复 SDK 中的动态导入路径（用于 GitHub Pages）
+    fixSdkDynamicImportsPlugin(),
   ],
   resolve: {
     // 使用 node_modules 中的包，不配置任何外部源码别名
@@ -238,7 +321,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // 手动配置代码分割策略
-        manualChunks: (id) => {
+        manualChunks: id => {
           // 将 chat-app-sdk 单独打包
           if (id.includes('@glodon-aiot/chat-app-sdk')) {
             return 'chat-sdk';
