@@ -1,18 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
 
-import { CustomJsonItem } from '../components/CustomJsonItem';
-import type { SortConfig } from '../components/utils/schema-config';
+import { CustomJsonItem } from './components/CustomJsonItem';
+import type { SortConfig } from './components/utils/schema-config';
 import {
   loadConfigFromStorage,
   saveConfigToStorage,
-} from '../components/utils/schema-config';
+} from './components/utils/schema-config';
 import {
   loadFormConfigFromStorage,
   saveFormConfigToStorage,
   type FormConfig,
-} from '../components/utils/form-config';
-import { NetworkSwitchWrapper } from '../components/NetworkSwitch';
-import { registerWebComponents } from '../components/registerWebComponents';
+} from './components/utils/form-config';
+import { NetworkSwitchWrapper } from './components/NetworkSwitch';
+import { registerWebComponents } from './components/registerWebComponents';
 import { Header } from './Header';
 import { RegisteredComponents } from './RegisteredComponents';
 import { BrowserCompatibility } from './BrowserCompatibility';

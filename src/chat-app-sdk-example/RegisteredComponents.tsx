@@ -19,6 +19,12 @@ const components: ComponentInfo[] = [
     textColor: '#52c41a',
   },
   {
+    name: 'merged-reference-list',
+    description: '合并参考来源列表组件\n展示合并的知识库和网络搜索结果',
+    borderColor: '#1890ff',
+    textColor: '#1890ff',
+  },
+  {
     name: 'demo-json-item',
     description: '自定义 JsonItem 组件\n支持多种 schema 渲染',
     borderColor: '#667eea',

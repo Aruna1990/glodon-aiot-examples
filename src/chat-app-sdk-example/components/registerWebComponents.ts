@@ -1,5 +1,6 @@
 import { SearchResultList } from './search-result-list';
 import { KnowledgeReferenceList } from './knowledge-reference-list';
+import { MergedReferenceList } from './merged-reference-list';
 import { CustomJsonItem } from './CustomJsonItem';
 import { CustomContentBox } from './CustomContentBox';
 
@@ -13,6 +14,11 @@ export const registerWebComponents = () => {
   if (!customElements.get('knowledge-reference-list')) {
     customElements.define('knowledge-reference-list', KnowledgeReferenceList);
     console.log('✅ Registered: knowledge-reference-list');
+  }
+
+  if (!customElements.get('merged-reference-list')) {
+    customElements.define('merged-reference-list', MergedReferenceList);
+    console.log('✅ Registered: merged-reference-list');
   }
 
   if (!customElements.get('demo-json-item')) {

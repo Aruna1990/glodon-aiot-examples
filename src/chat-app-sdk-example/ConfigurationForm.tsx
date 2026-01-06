@@ -1,5 +1,5 @@
-import { SchemaVersionSortConfig } from '../components/SchemaVersionSortConfig';
-import type { SortConfig } from '../components/utils/schema-config';
+import { SchemaVersionSortConfig } from './components/SchemaVersionSortConfig';
+import type { SortConfig } from './components/utils/schema-config';
 import { ExternalLink } from './ExternalLink';
 
 interface ConfigurationFormProps {

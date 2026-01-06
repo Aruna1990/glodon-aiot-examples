@@ -226,6 +226,16 @@ export class CustomJsonItem extends HTMLElement {
       if (knowledgeReferenceList) {
         knowledgeReferenceList.setData(data);
       }
+    } else if (schemaVersion === 'app.reference.merged_result.v1') {
+      // 使用独立的 MergedReferenceList 组件
+      this.shadowRoot.innerHTML =
+        '<merged-reference-list></merged-reference-list>';
+      const mergedReferenceList = this.shadowRoot.querySelector(
+        'merged-reference-list',
+      ) as any;
+      if (mergedReferenceList) {
+        mergedReferenceList.setData(data);
+      }
     } else {
       // 默认的 JSON 显示
       this.shadowRoot.innerHTML = `
