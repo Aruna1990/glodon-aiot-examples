@@ -234,27 +234,6 @@ export class MergedReferenceList extends HTMLElement {
   }
 
   /**
-   * 格式化日期为 YYYY-MM-DD 格式
-   * @param dateStr 日期字符串
-   * @returns 格式化后的日期字符串
-   */
-  private formatDate(dateStr: string): string {
-    if (!dateStr) {
-      return '';
-    }
-    try {
-      const date = new Date(dateStr);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    } catch (error) {
-      console.warn('[MergedReferenceList] Failed to format date:', error);
-      return dateStr;
-    }
-  }
-
-  /**
    * 从 URL 提取网站名称（域名）
    * @param link 网站链接
    * @param siteName 提供的网站名称（可选）
