@@ -13,13 +13,13 @@ import {
 } from './components/utils/form-config';
 import { NetworkSwitchWrapper } from './components/NetworkSwitch';
 import { registerWebComponents } from './components/registerWebComponents';
-import { Header } from './Header';
-import { RegisteredComponents } from './RegisteredComponents';
-import { BrowserCompatibility } from './BrowserCompatibility';
-import { InitializationSuccess } from './InitializationSuccess';
-import { UsageInstructions } from './UsageInstructions';
-import { DocumentationLink } from './DocumentationLink';
-import { ConfigurationForm } from './ConfigurationForm';
+import { Header } from './components/Header';
+import { RegisteredComponents } from './components/RegisteredComponents';
+import { BrowserCompatibility } from './components/BrowserCompatibility';
+import { InitializationSuccess } from './components/InitializationSuccess';
+import { UsageInstructions } from './components/UsageInstructions';
+import { DocumentationLink } from './components/DocumentationLink';
+import { ConfigurationForm } from './components/ConfigurationForm';
 
 // 注册 Web Components
 registerWebComponents();
