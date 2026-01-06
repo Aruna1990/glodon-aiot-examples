@@ -781,7 +781,7 @@ export class MergedReferenceList extends HTMLElement {
                 ${
                   result.fileUrl
                     ? `
-                  <a href="${result.fileUrl}" target="_blank" rel="noopener noreferrer" class="result-link" onclick="event.stopPropagation();">
+                  <a href="https://aiot-dev.glodon.com/portal/_/cvforcepd/doc-viewer/?url=${encodeURIComponent(result.fileUrl)}" target="_blank" rel="noopener noreferrer" class="result-link" onclick="event.stopPropagation();">
                     <div class="result-link-icon">${docIcon}</div>
                     <span>${this.escapeHtml(result.fileName || '这是一个知识文件')}</span>
                   </a>
