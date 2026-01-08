@@ -1,6 +1,7 @@
 import { SchemaVersionSortConfig } from './SchemaVersionSortConfig';
 import type { SortConfig } from './utils/schema-config';
 import { ExternalLink } from './ExternalLink';
+import { Tooltip } from './Tooltip';
 
 interface ConfigurationFormProps {
   token: string;
@@ -14,11 +15,13 @@ interface ConfigurationFormProps {
   setWorkflowId: (value: string) => void;
   draftMode: string;
   setDraftMode: (value: string) => void;
+  apiUrl: string;
+  setApiUrl: (value: string) => void;
+  logoUrl: string;
+  setLogoUrl: (value: string) => void;
   schemaSortConfig: SortConfig;
   setSchemaSortConfig: (config: SortConfig) => void;
   error: string;
-  isLoadingSdk: boolean;
-  onInitialize: () => void;
 }
 
 export const ConfigurationForm = ({
@@ -33,41 +36,32 @@ export const ConfigurationForm = ({
   setWorkflowId,
   draftMode,
   setDraftMode,
+  apiUrl,
+  setApiUrl,
+  logoUrl,
+  setLogoUrl,
   schemaSortConfig,
   setSchemaSortConfig,
   error,
-  isLoadingSdk,
-  onInitialize,
 }: ConfigurationFormProps) => {
-  return (
-    <div
-      style={{
-        background: 'white',
-        border: '2px solid #667eea',
-        borderRadius: '12px',
-        padding: '30px',
-        marginBottom: '30px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      }}
-    >
-      <h2 style={{ margin: '0 0 20px 0', color: '#667eea' }}>🔧 配置信息</h2>
-      <p style={{ margin: '0 0 20px 0', color: '#666', fontSize: '14px' }}>
-        请输入以下信息以初始化聊天客户端。您还可以配置 Schema Version
-        的渲染顺序，控制不同类型消息的显示优先级。
-      </p>
+  // 从 apiUrl 提取 host
+  const getHostFromApiUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.origin;
+    } catch {
+      return 'https://aiot-dev.glodon.com';
+    }
+  };
 
-      {/* 根路径信息展示 */}
-      <div
-        style={{
-          marginBottom: '20px',
-          padding: '12px 16px',
-          background: '#f8f9fa',
-          border: '1px solid #e0e0e0',
-          borderRadius: '6px',
-          fontSize: '13px',
-        }}
-      >
-        <div
+  const apiHost = getHostFromApiUrl(apiUrl);
+  return (
+    <div>
+      <h2 style={{ margin: '0 0 20px 0', color: '#667eea' }}>🔧 配置信息</h2>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label
+          htmlFor="apiurl-input"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -77,59 +71,93 @@ export const ConfigurationForm = ({
             color: '#333',
           }}
         >
-          <span>📍</span>
-          <span>当前路径信息</span>
-        </div>
-        <div style={{ color: '#666', lineHeight: '1.6' }}>
-          <div style={{ marginBottom: '4px' }}>
-            <strong>API 根路径：</strong>
-            <code
+          <span>API 根路径</span>
+          <Tooltip
+            content={
+              <div>
+                <strong>使用说明：</strong>
+                SDK 的 API 根路径，用于连接后端服务。
+              </div>
+            }
+          >
+            <span
               style={{
-                marginLeft: '8px',
-                padding: '2px 6px',
-                background: '#fff',
-                border: '1px solid #ddd',
-                borderRadius: '3px',
-                fontFamily: 'monospace',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                background: '#f0f0f0',
+                color: '#666',
+                cursor: 'help',
                 fontSize: '12px',
-                color: '#d63384',
+                fontWeight: 'normal',
               }}
             >
-              https://aiot-dev.glodon.com/api/cvforcepd/flow
-            </code>
-          </div>
-          <div>
-            <strong>当前页面：</strong>
-            <code
-              style={{
-                marginLeft: '8px',
-                padding: '2px 6px',
-                background: '#fff',
-                border: '1px solid #ddd',
-                borderRadius: '3px',
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                color: '#d63384',
-                wordBreak: 'break-all',
-              }}
-            >
-              {window.location.href}
-            </code>
-          </div>
-        </div>
+              ?
+            </span>
+          </Tooltip>
+        </label>
+        <input
+          id="apiurl-input"
+          type="text"
+          value={apiUrl}
+          onChange={e => setApiUrl(e.target.value)}
+          placeholder="https://aiot-dev.glodon.com/api/cvforcepd/flow"
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '1px solid #ddd',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontFamily: 'monospace',
+            boxSizing: 'border-box',
+          }}
+        />
       </div>
 
       <div style={{ marginBottom: '20px' }}>
         <label
           htmlFor="token-input"
           style={{
-            display: 'block',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
             marginBottom: '8px',
             fontWeight: 'bold',
             color: '#333',
           }}
         >
-          访问令牌（Token）<span style={{ color: 'red' }}>*</span>
+          <span>
+            Token<span style={{ color: 'red' }}>*</span>
+          </span>
+          <Tooltip
+            content={
+              <div>
+                <strong>使用说明：</strong>从环境变量 CHAT_APP_COZE_TOKEN
+                读取，或手动输入。访问令牌用于身份验证，请妥善保管。
+              </div>
+            }
+          >
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                background: '#f0f0f0',
+                color: '#666',
+                cursor: 'help',
+                fontSize: '12px',
+                fontWeight: 'normal',
+              }}
+            >
+              ?
+            </span>
+          </Tooltip>
         </label>
         <input
           id="token-input"
@@ -147,9 +175,6 @@ export const ConfigurationForm = ({
             boxSizing: 'border-box',
           }}
         />
-        <small style={{ color: '#999', fontSize: '12px' }}>
-          从环境变量 CHAT_APP_COZE_TOKEN 读取，或手动输入
-        </small>
       </div>
 
       {chatType === 'bot' && (
@@ -157,13 +182,44 @@ export const ConfigurationForm = ({
           <label
             htmlFor="botid-input"
             style={{
-              display: 'block',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
               marginBottom: '8px',
               fontWeight: 'bold',
               color: '#333',
             }}
           >
-            Bot ID<span style={{ color: 'red' }}>*</span>
+            <span>
+              Bot ID<span style={{ color: 'red' }}>*</span>
+            </span>
+            <Tooltip
+              content={
+                <div>
+                  <strong>使用说明：</strong>Bot 模式需要输入 Bot ID。从环境变量
+                  CHAT_APP_INDEX_COZE_BOT_ID 读取，或手动输入。Bot
+                  模式适用于简单的对话场景。
+                </div>
+              }
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  background: '#f0f0f0',
+                  color: '#666',
+                  cursor: 'help',
+                  fontSize: '12px',
+                  fontWeight: 'normal',
+                }}
+              >
+                ?
+              </span>
+            </Tooltip>
           </label>
           <input
             id="botid-input"
@@ -181,9 +237,6 @@ export const ConfigurationForm = ({
               boxSizing: 'border-box',
             }}
           />
-          <small style={{ color: '#999', fontSize: '12px' }}>
-            从环境变量 CHAT_APP_INDEX_COZE_BOT_ID 读取，或使用默认值
-          </small>
         </div>
       )}
 
@@ -201,16 +254,49 @@ export const ConfigurationForm = ({
               <label
                 htmlFor="appid-input"
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   fontWeight: 'bold',
                   color: '#333',
                   margin: 0,
                 }}
               >
-                App ID<span style={{ color: 'red' }}>*</span>
+                <span>
+                  App ID<span style={{ color: 'red' }}>*</span>
+                </span>
+                <Tooltip
+                  content={
+                    <div>
+                      <strong>使用说明：</strong>App 模式（推荐）需要输入 App ID
+                      和 Workflow ID。App
+                      模式支持更复杂的工作流和功能配置。从环境变量
+                      CHAT_APP_CHATFLOW_COZE_APP_ID 读取。
+                    </div>
+                  }
+                >
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#f0f0f0',
+                      color: '#666',
+                      cursor: 'help',
+                      fontSize: '12px',
+                      fontWeight: 'normal',
+                    }}
+                  >
+                    ?
+                  </span>
+                </Tooltip>
               </label>
               {appId.trim() && (
                 <ExternalLink
-                  href={`https://aiot-dev.glodon.com/portal/gldcv/cvforcepd/fe/#/space/1758636595/project-ide/${appId.trim()}`}
+                  href={`${apiHost}/portal/gldcv/cvforcepd/fe/#/space/1758636595/project-ide/${appId.trim()}`}
                   title="在系统中打开 App"
                 />
               )}
@@ -231,9 +317,6 @@ export const ConfigurationForm = ({
                 boxSizing: 'border-box',
               }}
             />
-            <small style={{ color: '#999', fontSize: '12px' }}>
-              从环境变量 CHAT_APP_CHATFLOW_COZE_APP_ID 读取
-            </small>
           </div>
 
           <div style={{ marginBottom: '20px' }}>
@@ -248,16 +331,48 @@ export const ConfigurationForm = ({
               <label
                 htmlFor="workflowid-input"
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   fontWeight: 'bold',
                   color: '#333',
                   margin: 0,
                 }}
               >
-                Workflow ID<span style={{ color: 'red' }}>*</span>
+                <span>
+                  Workflow ID<span style={{ color: 'red' }}>*</span>
+                </span>
+                <Tooltip
+                  content={
+                    <div>
+                      <strong>使用说明：</strong>Workflow ID
+                      指定要使用的具体工作流。从环境变量
+                      CHAT_APP_CHATFLOW_COZE_WORKFLOW_ID 读取。
+                    </div>
+                  }
+                >
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#f0f0f0',
+                      color: '#666',
+                      cursor: 'help',
+                      fontSize: '12px',
+                      fontWeight: 'normal',
+                    }}
+                  >
+                    ?
+                  </span>
+                </Tooltip>
               </label>
               {appId.trim() && workflowId.trim() && (
                 <ExternalLink
-                  href={`https://aiot-dev.glodon.com/portal/gldcv/cvforcepd/fe/#/space/1758636595/project-ide/${appId.trim()}/workflow/${workflowId.trim()}`}
+                  href={`${apiHost}/portal/gldcv/cvforcepd/fe/#/space/1758636595/project-ide/${appId.trim()}/workflow/${workflowId.trim()}`}
                   title="在系统中打开 Workflow"
                 />
               )}
@@ -278,56 +393,253 @@ export const ConfigurationForm = ({
                 boxSizing: 'border-box',
               }}
             />
-            <small style={{ color: '#999', fontSize: '12px' }}>
-              从环境变量 CHAT_APP_CHATFLOW_COZE_WORKFLOW_ID 读取
-            </small>
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <label
-              htmlFor="draftmode-select"
+            <div
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 marginBottom: '8px',
                 fontWeight: 'bold',
                 color: '#333',
               }}
             >
-              Draft Mode（草稿模式）
-            </label>
-            <select
-              id="draftmode-select"
-              value={draftMode}
-              onChange={e => setDraftMode(e.target.value)}
+              <span>草稿模式</span>
+              <Tooltip
+                content={
+                  <div>
+                    <strong>使用说明：</strong>
+                    可选配置。开启=草稿模式（用于测试），关闭=发布模式（生产环境）。默认值为草稿模式（开启）。从环境变量
+                    CHAT_APP_DRAFT_MODE 读取。
+                  </div>
+                }
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    background: '#f0f0f0',
+                    color: '#666',
+                    cursor: 'help',
+                    fontSize: '12px',
+                    fontWeight: 'normal',
+                  }}
+                >
+                  ?
+                </span>
+              </Tooltip>
+            </div>
+            <div
               style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontFamily: 'monospace',
-                boxSizing: 'border-box',
-                backgroundColor: 'white',
-                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
               }}
             >
-              <option value="true">true - 草稿（Draft）</option>
-              <option value="false">false - 发布（Online）</option>
-              <option value="">不设置（可选）</option>
-            </select>
-            <small style={{ color: '#999', fontSize: '12px' }}>
-              默认值为草稿模式（true）。从环境变量 CHAT_APP_DRAFT_MODE
-              读取，true=草稿，false=发布
-            </small>
+              <label
+                style={{
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: '50px',
+                  height: '26px',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={draftMode === 'true'}
+                  onChange={e => {
+                    setDraftMode(e.target.checked ? 'true' : 'false');
+                  }}
+                  style={{
+                    opacity: 0,
+                    width: 0,
+                    height: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: draftMode === 'true' ? '#667eea' : '#ccc',
+                    borderRadius: '26px',
+                    transition: 'background-color 0.3s',
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      content: '""',
+                      height: '20px',
+                      width: '20px',
+                      left: '3px',
+                      bottom: '3px',
+                      backgroundColor: 'white',
+                      borderRadius: '50%',
+                      transition: 'transform 0.3s',
+                      transform:
+                        draftMode === 'true'
+                          ? 'translateX(24px)'
+                          : 'translateX(0)',
+                    }}
+                  />
+                </span>
+              </label>
+              <span style={{ color: '#666', fontSize: '14px' }}>
+                {draftMode === 'true' ? '草稿模式' : '发布模式'}
+              </span>
+            </div>
           </div>
         </>
       )}
 
+      {/* Logo URL 配置 */}
+      <div style={{ marginBottom: '20px' }}>
+        <label
+          htmlFor="logourl-input"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '8px',
+            fontWeight: 'bold',
+            color: '#333',
+          }}
+        >
+          <span>Logo URL</span>
+          <Tooltip
+            content={
+              <div>
+                <strong>使用说明：</strong>
+                设置 SDK 聊天窗口的 Logo 图标地址。支持图片 URL 链接。
+              </div>
+            }
+          >
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                background: '#f0f0f0',
+                color: '#666',
+                cursor: 'help',
+                fontSize: '12px',
+                fontWeight: 'normal',
+              }}
+            >
+              ?
+            </span>
+          </Tooltip>
+        </label>
+        <input
+          id="logourl-input"
+          type="text"
+          value={logoUrl}
+          onChange={e => setLogoUrl(e.target.value)}
+          placeholder="https://minio-dev.glodon.com/opencoze/default_icon/default_agent_icon.png"
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '1px solid #ddd',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontFamily: 'monospace',
+            boxSizing: 'border-box',
+          }}
+        />
+        {logoUrl && (
+          <div style={{ marginTop: '8px' }}>
+            <img
+              src={logoUrl}
+              alt="Logo preview"
+              style={{
+                maxWidth: '100px',
+                maxHeight: '100px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                padding: '4px',
+                background: '#f9f9f9',
+              }}
+              onError={e => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Schema Version 排序配置 */}
-      <SchemaVersionSortConfig
-        config={schemaSortConfig}
-        onChange={setSchemaSortConfig}
-      />
+      <div style={{ marginBottom: '20px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '12px',
+          }}
+        >
+          <label
+            style={{
+              fontWeight: 'bold',
+              color: '#333',
+              margin: 0,
+            }}
+          >
+            Schema Version 排序配置
+          </label>
+          <Tooltip
+            content={
+              <div>
+                <strong>Schema Version 排序配置说明：</strong>
+                <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                  <li>通过拖拽调整不同数据定义版本的渲染顺序</li>
+                  <li>正数区域：正常顺序渲染（renderIndex: 1, 2, 3...）</li>
+                  <li>
+                    负数区域：延迟渲染，在 chat complete 后渲染（renderIndex:
+                    -1, -2, -3...）
+                  </li>
+                  <li>可以添加自定义数据定义版本，默认项不能删除</li>
+                  <li>配置会自动保存到 localStorage</li>
+                </ul>
+              </div>
+            }
+          >
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                background: '#f0f0f0',
+                color: '#666',
+                cursor: 'help',
+                fontSize: '12px',
+                fontWeight: 'normal',
+              }}
+            >
+              ?
+            </span>
+          </Tooltip>
+        </div>
+        <SchemaVersionSortConfig
+          config={schemaSortConfig}
+          onChange={setSchemaSortConfig}
+        />
+      </div>
 
       {error ? (
         <div
@@ -344,52 +656,6 @@ export const ConfigurationForm = ({
           ⚠️ {error}
         </div>
       ) : null}
-
-      <button
-        onClick={onInitialize}
-        disabled={isLoadingSdk}
-        style={{
-          width: '100%',
-          padding: '14px',
-          background: isLoadingSdk
-            ? '#ccc'
-            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          fontSize: '16px',
-          fontWeight: 'bold',
-          cursor: isLoadingSdk ? 'not-allowed' : 'pointer',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-          opacity: isLoadingSdk ? 0.7 : 1,
-        }}
-        onMouseOver={e => {
-          if (!isLoadingSdk) {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-          }
-        }}
-        onMouseOut={e => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = 'none';
-        }}
-      >
-        {isLoadingSdk ? '⏳ 正在加载 SDK...' : '🚀 初始化聊天客户端'}
-      </button>
-
-      <div
-        style={{
-          marginTop: '20px',
-          padding: '12px',
-          background: '#e3f2fd',
-          borderRadius: '6px',
-          fontSize: '13px',
-          color: '#1976d2',
-        }}
-      >
-        💡 <strong>提示：</strong>
-        如果您没有访问令牌，请到平台上获取，或者联系开发团队
-      </div>
     </div>
   );
 };

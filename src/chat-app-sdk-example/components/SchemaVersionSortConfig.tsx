@@ -251,6 +251,8 @@ export const SchemaVersionSortConfig = ({
             cursor: 'move',
             opacity: isDragging ? 0.5 : 1,
             transition: 'all 0.2s',
+            overflow: 'hidden',
+            wordBreak: 'break-word',
           }}
         >
           <div
@@ -262,13 +264,15 @@ export const SchemaVersionSortConfig = ({
           >
             ⋮⋮
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', wordBreak: 'break-word' }}>
             <div
               style={{
                 fontWeight: 'bold',
                 fontSize: '14px',
                 color: '#333',
                 marginBottom: '4px',
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word',
               }}
             >
               {item.schemaVersion}
@@ -289,6 +293,9 @@ export const SchemaVersionSortConfig = ({
               style={{
                 fontSize: '12px',
                 color: '#666',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
               渲染索引: {item.renderIndex}
@@ -317,15 +324,7 @@ export const SchemaVersionSortConfig = ({
   };
 
   return (
-    <div
-      style={{
-        background: 'white',
-        border: '2px solid #667eea',
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
-      }}
-    >
+    <div>
       <h3
         style={{
           margin: '0 0 16px 0',
@@ -350,8 +349,8 @@ export const SchemaVersionSortConfig = ({
         style={{
           display: 'flex',
           gap: '8px',
-          marginBottom: '20px',
-          padding: '12px',
+          marginBottom: '16px',
+          padding: '8px',
           background: '#f8f9fa',
           borderRadius: '6px',
         }}
@@ -413,17 +412,20 @@ export const SchemaVersionSortConfig = ({
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: '20px',
+          width: '100%',
+          height: '100%',
+          minHeight: '400px',
         }}
       >
         {/* 正数区域 */}
-        <div>
+        <div style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              marginBottom: '12px',
-              padding: '8px',
+              marginBottom: '8px',
+              padding: '6px',
               background: '#e8f5e9',
               borderRadius: '6px',
             }}
@@ -443,11 +445,13 @@ export const SchemaVersionSortConfig = ({
             onDragOver={handleDragOver}
             onDrop={e => handleDrop(e, 'positive', config.positive.length)}
             style={{
+              flex: 1,
               minHeight: '100px',
-              padding: '12px',
+              padding: '8px',
               background: '#f1f8e9',
               borderRadius: '6px',
               border: '2px dashed #8bc34a',
+              overflowY: 'auto',
             }}
           >
             {config.positive.length === 0 ? (
@@ -456,7 +460,7 @@ export const SchemaVersionSortConfig = ({
                   textAlign: 'center',
                   color: '#999',
                   fontSize: '13px',
-                  padding: '20px',
+                  padding: '12px',
                 }}
               >
                 拖拽项目到这里
@@ -476,14 +480,14 @@ export const SchemaVersionSortConfig = ({
         </div>
 
         {/* 负数区域 */}
-        <div>
+        <div style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              marginBottom: '12px',
-              padding: '8px',
+              marginBottom: '8px',
+              padding: '6px',
               background: '#fff3e0',
               borderRadius: '6px',
             }}
@@ -503,11 +507,13 @@ export const SchemaVersionSortConfig = ({
             onDragOver={handleDragOver}
             onDrop={e => handleDrop(e, 'negative', config.negative.length)}
             style={{
+              flex: 1,
               minHeight: '100px',
-              padding: '12px',
+              padding: '8px',
               background: '#fff3e0',
               borderRadius: '6px',
               border: '2px dashed #ff9800',
+              overflowY: 'auto',
             }}
           >
             {config.negative.length === 0 ? (
@@ -516,7 +522,7 @@ export const SchemaVersionSortConfig = ({
                   textAlign: 'center',
                   color: '#999',
                   fontSize: '13px',
-                  padding: '20px',
+                  padding: '12px',
                 }}
               >
                 拖拽项目到这里
