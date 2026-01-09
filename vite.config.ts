@@ -412,22 +412,10 @@ export default defineConfig({
     '**/*.woff2',
     '**/*.eot',
   ],
-  // 配置依赖优化：配置 esbuild 如何处理资源文件
+  // 配置依赖优化
   optimizeDeps: {
-    esbuildOptions: {
-      loader: {
-        // 将所有静态资源文件作为文件资源处理
-        '.svg': 'file',
-        '.png': 'file',
-        '.jpg': 'file',
-        '.jpeg': 'file',
-        '.gif': 'file',
-        '.ttf': 'file',
-        '.woff': 'file',
-        '.woff2': 'file',
-        '.eot': 'file',
-      },
-    },
+    // 排除 SDK 的预构建，因为 SDK 中包含了 webpack 特定的代码
+    exclude: ['@glodon-aiot/chat-app-sdk'],
   },
   server: {
     port: 3000,
