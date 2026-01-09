@@ -66,7 +66,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           }}
         >
           <img
-            src="/favicon.png"
+            src={`${import.meta.env.BASE_URL}favicon.png`}
             alt="Logo"
             style={{
               width: '32px',
