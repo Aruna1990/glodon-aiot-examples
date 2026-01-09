@@ -58,7 +58,22 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           zIndex: 100,
         }}
       >
-        <div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <img
+            src="/favicon.png"
+            alt="Logo"
+            style={{
+              width: '32px',
+              height: '32px',
+              objectFit: 'contain',
+            }}
+          />
           <h1
             style={{
               margin: 0,
@@ -68,7 +83,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               lineHeight: '1.4',
             }}
           >
-            Glodon AloT Chat SDK Demo
+            @glodon-aiot/chat-app-sdk
           </h1>
         </div>
         <div
