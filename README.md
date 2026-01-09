@@ -111,7 +111,7 @@ This example demonstrates:
 
 ## Learn More
 
-- [Chat App SDK Documentation](../../README.md)
+- [Chat App SDK 介绍](https://aruna1990.github.io/glodon-aiot-examples/)
 - [Web Components Guide](https://developer.mozilla.org/en-US/docs/Web/Web_Components)
 
 ## License
