@@ -325,15 +325,6 @@ export const SchemaVersionSortConfig = ({
 
   return (
     <div>
-      <h3
-        style={{
-          margin: '0 0 16px 0',
-          color: '#667eea',
-          fontSize: '18px',
-        }}
-      >
-        📋 Schema Version 排序配置
-      </h3>
       <p
         style={{
           margin: '0 0 20px 0',
@@ -341,7 +332,7 @@ export const SchemaVersionSortConfig = ({
           fontSize: '13px',
         }}
       >
-        拖拽项目调整顺序，负数区域表示延迟渲染（在 chat complete 后渲染）
+        拖拽数据定义版本项目调整渲染顺序
       </p>
 
       {/* 添加新项 */}
@@ -386,8 +377,8 @@ export const SchemaVersionSortConfig = ({
             cursor: 'pointer',
           }}
         >
-          <option value="positive">正数区域</option>
-          <option value="negative">负数区域</option>
+          <option value="positive">最终回答前渲染</option>
+          <option value="negative">最终回答后渲染</option>
         </select>
         <button
           onClick={handleAdd}
@@ -417,8 +408,16 @@ export const SchemaVersionSortConfig = ({
           minHeight: '400px',
         }}
       >
-        {/* 正数区域 */}
-        <div style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* 最终回答前渲染 */}
+        <div
+          style={{
+            width: '100%',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+          }}
+        >
           <div
             style={{
               display: 'flex',
@@ -438,7 +437,7 @@ export const SchemaVersionSortConfig = ({
                 fontSize: '14px',
               }}
             >
-              正数区域（正常渲染）
+              最终回答前渲染
             </span>
           </div>
           <div
@@ -463,7 +462,7 @@ export const SchemaVersionSortConfig = ({
                   padding: '12px',
                 }}
               >
-                拖拽项目到这里
+                最终回答前渲染
               </div>
             ) : (
               [...config.positive]
@@ -479,8 +478,16 @@ export const SchemaVersionSortConfig = ({
           </div>
         </div>
 
-        {/* 负数区域 */}
-        <div style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* 最终回答后渲染 */}
+        <div
+          style={{
+            width: '100%',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+          }}
+        >
           <div
             style={{
               display: 'flex',
@@ -500,7 +507,7 @@ export const SchemaVersionSortConfig = ({
                 fontSize: '14px',
               }}
             >
-              负数区域（延迟渲染）
+              最终回答后渲染
             </span>
           </div>
           <div
@@ -525,7 +532,7 @@ export const SchemaVersionSortConfig = ({
                   padding: '12px',
                 }}
               >
-                拖拽项目到这里
+                最终回答后渲染
               </div>
             ) : (
               config.negative.map((item, index) =>

@@ -58,18 +58,10 @@ export const ConfigurationForm = ({
   return (
     <div>
       <h2 style={{ margin: '0 0 20px 0', color: '#667eea' }}>🔧 配置信息</h2>
-      {/* 根路径信息展示 */}
-      <div
-        style={{
-          marginBottom: '20px',
-          padding: '12px 16px',
-          background: '#f8f9fa',
-          border: '1px solid #e0e0e0',
-          borderRadius: '6px',
-          fontSize: '13px',
-        }}
-      >
-        <div
+
+      <div style={{ marginBottom: '20px' }}>
+        <label
+          htmlFor="apiurl-input"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -79,40 +71,51 @@ export const ConfigurationForm = ({
             color: '#333',
           }}
         >
-          <span>📍</span>
-          <span>当前路径信息</span>
-        </div>
-        <div style={{ color: '#666', lineHeight: '1.6' }}>
-          <div style={{ marginBottom: '12px' }}>
-            <label
-              htmlFor="apiurl-input"
+          <span>API 根路径</span>
+          <Tooltip
+            position="right"
+            content={
+              <div>
+                <strong>使用说明：</strong>
+                SDK 的 API 根路径，用于连接后端服务。
+              </div>
+            }
+          >
+            <span
               style={{
-                display: 'block',
-                fontWeight: 'bold',
-                color: '#333',
-                marginBottom: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                background: '#f0f0f0',
+                color: '#666',
+                cursor: 'help',
+                fontSize: '12px',
+                fontWeight: 'normal',
               }}
             >
-              API 根路径：
-            </label>
-            <input
-              id="apiurl-input"
-              type="text"
-              value={apiUrl}
-              onChange={e => setApiUrl(e.target.value)}
-              placeholder="https://aiot-dev.glodon.com/api/cvforcepd/flow"
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontFamily: 'monospace',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-        </div>
+              ?
+            </span>
+          </Tooltip>
+        </label>
+        <input
+          id="apiurl-input"
+          type="text"
+          value={apiUrl}
+          onChange={e => setApiUrl(e.target.value)}
+          placeholder="https://aiot-dev.glodon.com/api/cvforcepd/flow"
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '1px solid #ddd',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontFamily: 'monospace',
+            boxSizing: 'border-box',
+          }}
+        />
       </div>
 
       <div style={{ marginBottom: '20px' }}>
@@ -131,6 +134,7 @@ export const ConfigurationForm = ({
             Token<span style={{ color: 'red' }}>*</span>
           </span>
           <Tooltip
+            position="right"
             content={
               <div>
                 <strong>使用说明：</strong>从环境变量 CHAT_APP_COZE_TOKEN
@@ -192,6 +196,7 @@ export const ConfigurationForm = ({
               Bot ID<span style={{ color: 'red' }}>*</span>
             </span>
             <Tooltip
+              position="right"
               content={
                 <div>
                   <strong>使用说明：</strong>Bot 模式需要输入 Bot ID。从环境变量
@@ -264,6 +269,7 @@ export const ConfigurationForm = ({
                   App ID<span style={{ color: 'red' }}>*</span>
                 </span>
                 <Tooltip
+                  position="right"
                   content={
                     <div>
                       <strong>使用说明：</strong>App 模式（推荐）需要输入 App ID
@@ -341,6 +347,7 @@ export const ConfigurationForm = ({
                   Workflow ID<span style={{ color: 'red' }}>*</span>
                 </span>
                 <Tooltip
+                  position="right"
                   content={
                     <div>
                       <strong>使用说明：</strong>Workflow ID
@@ -406,6 +413,7 @@ export const ConfigurationForm = ({
             >
               <span>草稿模式</span>
               <Tooltip
+                position="right"
                 content={
                   <div>
                     <strong>使用说明：</strong>
@@ -515,6 +523,7 @@ export const ConfigurationForm = ({
         >
           <span>Logo URL</span>
           <Tooltip
+            position="right"
             content={
               <div>
                 <strong>使用说明：</strong>
@@ -598,6 +607,7 @@ export const ConfigurationForm = ({
             JSON 输出排序配置
           </label>
           <Tooltip
+            position="right"
             content={
               <div>
                 <strong>JSON 输出根据Schema Version 排序：</strong>

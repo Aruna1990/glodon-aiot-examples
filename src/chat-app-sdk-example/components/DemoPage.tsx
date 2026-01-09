@@ -292,49 +292,9 @@ export const DemoPage = ({ onInitialized }: DemoPageProps) => {
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
+            height: '100%',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              marginBottom: '24px',
-            }}
-          >
-            <button
-              onClick={initializeClient}
-              disabled={isLoadingSdk}
-              style={{
-                flex: 1,
-                padding: '14px',
-                background: isLoadingSdk
-                  ? '#ccc'
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                cursor: isLoadingSdk ? 'not-allowed' : 'pointer',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                opacity: isLoadingSdk ? 0.7 : 1,
-              }}
-              onMouseOver={e => {
-                if (!isLoadingSdk) {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow =
-                    '0 4px 12px rgba(0,0,0,0.2)';
-                }
-              }}
-              onMouseOut={e => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              {isLoadingSdk ? '⏳ 正在加载 SDK...' : '🚀 初始化聊天客户端'}
-            </button>
-          </div>
           {!isInitialized ? (
             <div
               style={{
@@ -346,14 +306,58 @@ export const DemoPage = ({ onInitialized }: DemoPageProps) => {
                 borderRadius: '8px',
                 border: '1px dashed #e0e0e0',
                 flex: 1,
+                height: '100%',
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '24px',
               }}
             >
               <p style={{ margin: 0 }}>
                 请在左侧配置SDK参数并点击"初始化聊天客户端"按钮
               </p>
+              <button
+                onClick={initializeClient}
+                disabled={isLoadingSdk}
+                style={{
+                  padding: '14px 28px',
+                  background: isLoadingSdk
+                    ? '#ccc'
+                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: isLoadingSdk ? 'not-allowed' : 'pointer',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  opacity: isLoadingSdk ? 0.7 : 1,
+                }}
+                onMouseOver={e => {
+                  if (!isLoadingSdk) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow =
+                      '0 4px 12px rgba(0,0,0,0.2)';
+                  }
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {isLoadingSdk ? '⏳ 正在加载 SDK...' : '🚀 初始化聊天客户端'}
+              </button>
             </div>
           ) : (
-            <div>
+            <div
+              style={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
               <InitializationSuccess />
             </div>
           )}
