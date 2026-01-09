@@ -58,10 +58,18 @@ export const ConfigurationForm = ({
   return (
     <div>
       <h2 style={{ margin: '0 0 20px 0', color: '#667eea' }}>🔧 配置信息</h2>
-
-      <div style={{ marginBottom: '20px' }}>
-        <label
-          htmlFor="apiurl-input"
+      {/* 根路径信息展示 */}
+      <div
+        style={{
+          marginBottom: '20px',
+          padding: '12px 16px',
+          background: '#f8f9fa',
+          border: '1px solid #e0e0e0',
+          borderRadius: '6px',
+          fontSize: '13px',
+        }}
+      >
+        <div
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -71,50 +79,40 @@ export const ConfigurationForm = ({
             color: '#333',
           }}
         >
-          <span>API 根路径</span>
-          <Tooltip
-            content={
-              <div>
-                <strong>使用说明：</strong>
-                SDK 的 API 根路径，用于连接后端服务。
-              </div>
-            }
-          >
-            <span
+          <span>📍</span>
+          <span>当前路径信息</span>
+        </div>
+        <div style={{ color: '#666', lineHeight: '1.6' }}>
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              htmlFor="apiurl-input"
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '18px',
-                height: '18px',
-                borderRadius: '50%',
-                background: '#f0f0f0',
-                color: '#666',
-                cursor: 'help',
-                fontSize: '12px',
-                fontWeight: 'normal',
+                display: 'block',
+                fontWeight: 'bold',
+                color: '#333',
+                marginBottom: '8px',
               }}
             >
-              ?
-            </span>
-          </Tooltip>
-        </label>
-        <input
-          id="apiurl-input"
-          type="text"
-          value={apiUrl}
-          onChange={e => setApiUrl(e.target.value)}
-          placeholder="https://aiot-dev.glodon.com/api/cvforcepd/flow"
-          style={{
-            width: '100%',
-            padding: '12px',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontFamily: 'monospace',
-            boxSizing: 'border-box',
-          }}
-        />
+              API 根路径：
+            </label>
+            <input
+              id="apiurl-input"
+              type="text"
+              value={apiUrl}
+              onChange={e => setApiUrl(e.target.value)}
+              placeholder="https://aiot-dev.glodon.com/api/cvforcepd/flow"
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #ddd',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontFamily: 'monospace',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
@@ -580,7 +578,7 @@ export const ConfigurationForm = ({
         )}
       </div>
 
-      {/* Schema Version 排序配置 */}
+      {/* JSON 输出排序配置 */}
       <div style={{ marginBottom: '20px' }}>
         <div
           style={{
@@ -597,12 +595,12 @@ export const ConfigurationForm = ({
               margin: 0,
             }}
           >
-            Schema Version 排序配置
+            JSON 输出排序配置
           </label>
           <Tooltip
             content={
               <div>
-                <strong>Schema Version 排序配置说明：</strong>
+                <strong>JSON 输出根据Schema Version 排序：</strong>
                 <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
                   <li>通过拖拽调整不同数据定义版本的渲染顺序</li>
                   <li>正数区域：正常顺序渲染（renderIndex: 1, 2, 3...）</li>
