@@ -23,7 +23,8 @@ const DEFAULT_FORM_CONFIG: FormConfig = {
   draftMode: 'true',
   connectNetwork: 0,
   apiUrl: 'https://aiot-dev.glodon.com/api/cvforcepd/flow',
-  logoUrl: 'https://minio-dev.glodon.com/opencoze/default_icon/default_agent_icon.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=IELEY0R9LRLA4IQI60T1%2F20251231%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20251231T033702Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=8760f1429d02997191248194fd15228b61f91a1e6e71a12b2d2a2fd3d96c8eca',
+  logoUrl:
+    'https://cv-cdn.obs.cn-north-4.myhuaweicloud.com/glodon/images/chatlogo.png',
 };
 
 export const loadFormConfigFromStorage = (): FormConfig => {
