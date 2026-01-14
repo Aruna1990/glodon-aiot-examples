@@ -25,6 +25,12 @@ const components: ComponentInfo[] = [
     textColor: '#1890ff',
   },
   {
+    name: 'reasoning-content',
+    description: '推理内容组件\n展示 app.llm.reasoningcontent.v1 格式的推理内容（Markdown）',
+    borderColor: '#ff9800',
+    textColor: '#ff9800',
+  },
+  {
     name: 'demo-json-item',
     description: '自定义 JsonItem 组件\n支持多种 schema 渲染',
     borderColor: '#667eea',

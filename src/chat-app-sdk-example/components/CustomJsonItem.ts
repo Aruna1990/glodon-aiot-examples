@@ -236,6 +236,16 @@ export class CustomJsonItem extends HTMLElement {
       if (mergedReferenceList) {
         mergedReferenceList.setData(data);
       }
+    } else if (schemaVersion === 'app.llm.reasoningcontent.v1') {
+      // 使用独立的 ReasoningContent 组件
+      this.shadowRoot.innerHTML =
+        '<reasoning-content></reasoning-content>';
+      const reasoningContent = this.shadowRoot.querySelector(
+        'reasoning-content',
+      ) as any;
+      if (reasoningContent) {
+        reasoningContent.setData(data);
+      }
     } else {
       // 默认的 JSON 显示
       this.shadowRoot.innerHTML = `
